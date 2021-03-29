@@ -111,7 +111,7 @@ class Vocab(object):
         num_words = len(counts)
         self.worddict = {}
 
-        self.offset = 1
+        self.offset = 0
 
         # self.worddict["__pad__"] = 0
         # self.worddict["__oov__"] = 1

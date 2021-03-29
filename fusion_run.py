@@ -28,7 +28,7 @@ def main(args):
     work_dir = os.path.join(work_dir, 'ubuntu_corpus')
     work_dir = os.path.join(work_dir, time.strftime('%Y%m%d-%H%M%S'))
     logging = create_exp_dir(work_dir,
-        scripts_to_save=['../run.py', '../model/{}.py'.format(args.model.lower())], debug=args.debug)
+        scripts_to_save=['../fusion_run.py', '../model/{}.py'.format(args.model.lower())], debug=args.debug)
 
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
