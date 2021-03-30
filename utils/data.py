@@ -8,7 +8,7 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 from transformers import (
     BertModel,
-    BertTokenizerFast,
+    BertTokenizer,
     DistilBertTokenizerFast,
     DistilBertModel,
 )
@@ -51,10 +51,10 @@ class Vocab(object):
         self.lower_case = lower_case
         self.model_name = model_name
         if 'distilbert' in model_name:
-            self.tokenizer = DistilBertTokenizerFast.from_pretrained(vocab_file if vocab_file else model_name,
+            self.tokenizer = DistilBertTokenizerFast.from_pretrained(bert_path if bert_path else model_name,
                                                                      do_lower_case=lower_case)
         elif 'bert' in model_name:
-            self.tokenizer = BertTokenizerFast.from_pretrained(vocab_file if vocab_file else model_name,
+            self.tokenizer = BertTokenizer.from_pretrained(vocab_file if vocab_file else model_name,
                                                                do_lower_case=lower_case)
         else:
             self.tokenizer = spacy.load("en_core_web_sm")

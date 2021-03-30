@@ -1,6 +1,6 @@
 test*
 
-
+*/__pycache__
 data/
 logs/
 checkpoints/
