@@ -72,16 +72,16 @@ class Vocab(object):
         task = self.progress.add_task(type, dataset="UbuntuCorpus/{}".format(type), start=False)
         f = pd.read_csv(path)
         header = f.columns
-        context = f[header[0]].tolist()
-        response = f[header[1]].tolist()
+        context = f[header[0]].tolist()[:10]
+        response = f[header[1]].tolist()[:10]
         if train:
-            label = torch.tensor(f[header[2]])
+            label = torch.tensor(f[header[2]])[:10]
             data = (context, response, label)
+            self.build_worddict(*data)
         else:
             neg_samples = header[2:]
             neg_data = [f[neg].tolist() for neg in neg_samples]
             data = (context, response, neg_data)
-
         return self.iter_data(data, task, train, func)
 
     def load_vocab(self,
@@ -90,16 +90,18 @@ class Vocab(object):
             for idx, word in enumerate(f):
                 self.worddict[word[:-1]] = idx
 
-    def build_worddict(self, c, r, l):
-
+    def get_word(self, c, r, l):
         words = []
         [words.extend(sentence) for sentence in c]
         [words.extend(sentence) for sentence in r]
+        return words
+    def build_worddict(self, c, r, l):
+
+        words = self.get_word(c, r, l) # TODO need to add words from train set when test
+        self.tokenizer.add_tokens(words)
 
         counts = Counter(words)
         num_words = len(counts)
-        self.worddict = {}
-
         self.offset = 0
 
         # self.worddict["__pad__"] = 0
@@ -110,7 +112,7 @@ class Vocab(object):
         #     offset += 1
         n_tokens = len(self.worddict)
         for i, word in enumerate(counts.most_common(num_words)):
-            if word not in self.worddict:
+            if word[0] not in self.worddict:
                 self.worddict[word[0]] = n_tokens
                 n_tokens += 1
 
@@ -255,23 +257,15 @@ class UbuntuCorpus(Dataset):
         self.data = self.load_data(s_path)
 
         if not self.data:
-            if type == 'train':
-                self.data = self.Vocab.read_csv_file(path=path, train=True)
-            else:
-                self.data = self.Vocab.read_csv_file(path=path, train=False)
-
+            self.data = self.Vocab.read_csv_file(path=path, train=(type=='train'))
             # word2vec
             wordict_path = os.path.join(save_path, 'worddict')
             if os.path.exists(wordict_path):
                 self.Vocab.worddict = self.load(wordict_path)
-            else:
-                if type == 'train':
-                    self.Vocab.build_worddict(*self.data)
+            elif type == 'train' and self.Vocab.worddict:
                     self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
             # build_worddict first
             assert self.Vocab.worddict != {}
-            self.data = self.Vocab.file_to_indices(data=self.data,
-                                                   train=type == 'train')
             self.dump(self.data, s_path)
         if type == 'train':
             if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
@@ -355,12 +349,13 @@ if __name__ == '__main__':
 
     path = '/remote_workspace/dataset/default/valid.csv'
     train_path = '/remote_workspace/dataset/default/train.csv'
-    save_path = '/remote_workspace/rs_trans/data/bert'
-    model_name = 'bert-base-uncased'
-    val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'])
-    train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'])
-    val_dataloader = DataLoader(val_dataset, batch_size=3, collate_fn=ub_corpus_test_collate_fn)
-    # train_dataloader = DataLoader(train_dataset, batch_size=16, collate_fn=ub_corpus_train_collate_fn)
+    save_path = '/remote_workspace/fusion_esim/data/examples'
+    model_name = 'bert'
+    bert_path = '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8'
+    # val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'])
+    train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    # val_dataloader = DataLoader(val_dataset, batch_size=3, collate_fn=ub_corpus_test_collate_fn)
+    train_dataloader = DataLoader(train_dataset, batch_size=16, collate_fn=ub_corpus_train_collate_fn)
     # while 1:
     #
     #     for i, (c, s, n) in enumerate(val_dataloader):

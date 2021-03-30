@@ -1,5 +1,6 @@
 test*
-
+.gitignore
+.idea
 
 data/
 logs/
