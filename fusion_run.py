@@ -75,12 +75,8 @@ def main(args):
 
     ## build word embedding
     _word_embedding = train_dataset.embeddings
-    _word_embedding = torch.FloatTensor(_word_embedding.wv.vectors)
-    offset, n_token = train_dataset.Vocab.offset, len(train_dataset.Vocab.worddict)
-    # randn_embedding = torch.normal(0, 1, size=(n_token, args.d_embed))
-    randn_embedding = torch.randn(n_token, args.d_embed) # uniform distribution
-    randn_embedding[offset:len(_word_embedding)+offset, :] = _word_embedding
-    embedding_layer = nn.Embedding.from_pretrained(randn_embedding, freeze=False)
+    _word_embedding = torch.FloatTensor(_word_embedding)
+    embedding_layer = nn.Embedding.from_pretrained(_word_embedding, freeze=False)
 
     ## Build Bert model
     if 'bert' in model_name:
