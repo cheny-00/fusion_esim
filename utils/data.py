@@ -125,7 +125,7 @@ class Vocab(object):
             if word in self.worddict:
                 index = self.worddict[word]
             else:
-                index = self.worddict["__oov__"]
+                index = self.worddict["[UNK]"]
             indices.append(index)
         return indices
 
@@ -260,23 +260,19 @@ class UbuntuCorpus(Dataset):
             else:
                 self.data = self.Vocab.read_csv_file(path=path, train=False)
 
-
-            if 'bert' in kwargs['model_name']:
-                self.dump(self.data, s_path)
+            # word2vec
+            wordict_path = os.path.join(save_path, 'worddict')
+            if os.path.exists(wordict_path):
+                self.Vocab.worddict = self.load(wordict_path)
             else:
-                # word2vec
-                wordict_path = os.path.join(save_path, 'worddict')
-                if os.path.exists(wordict_path):
-                    self.Vocab.worddict = self.load(wordict_path)
-                else:
-                    if type == 'train':
-                        self.Vocab.build_worddict(*self.data)
-                        self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
-                # build_worddict first
-                assert self.Vocab.worddict != {}
-                self.data = self.Vocab.file_to_indices(data=self.data,
-                                                       train=type == 'train')
-                self.dump(self.data, s_path)
+                if type == 'train':
+                    self.Vocab.build_worddict(*self.data)
+                    self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
+            # build_worddict first
+            assert self.Vocab.worddict != {}
+            self.data = self.Vocab.file_to_indices(data=self.data,
+                                                   train=type == 'train')
+            self.dump(self.data, s_path)
         if type == 'train':
             if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
             emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.txt'])
