@@ -21,7 +21,6 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 import spacy
-from spacy.attrs import ORTH
 from collections import Counter
 from gensim.models import Word2Vec
 import multiprocessing
@@ -34,9 +33,8 @@ class Vocab(object):
                  worddict={}):
 
         self.worddict = worddict
-        vocab_file = os.path.join(bert_path, "vocab.txt") if bert_path else None
-        if vocab_file:
-            self.load_vocab(vocab_file)
+        if bert_path:
+            self.load_vocab(os.path.join(bert_path, 'vocab.txt'))
         self.progress = Progress(
             TextColumn("[bold blue]{task.fields[dataset]}", justify="right"),
             BarColumn(bar_width=100, style="black on white"),
@@ -54,26 +52,17 @@ class Vocab(object):
             self.tokenizer = DistilBertTokenizerFast.from_pretrained(bert_path if bert_path else model_name,
                                                                      do_lower_case=lower_case)
         elif 'bert' in model_name:
-            self.tokenizer = BertTokenizer.from_pretrained(vocab_file if vocab_file else model_name,
-                                                               do_lower_case=lower_case)
-        else:
-            self.tokenizer = spacy.load("en_core_web_sm")
-            spacy_specials_trans = [[{ORTH:"__eou__"}], [{ORTH:"__eot__"}]]
-            for s, n in zip(self.special, spacy_specials_trans):
-                self.tokenizer.tokenizer.add_special_case(s, n)
-
+            self.tokenizer = BertTokenizer.from_pretrained(bert_path if bert_path else model_name,
+                                                           do_lower_case=lower_case)
     def pre_tokenize(self, line):
         for token in self.special:
             line = line.replace(token, "")
         return line
 
     def tokenize(self, line): #TODO remove special tokens, split turn
-        if 'bert' in self.model_name:
-            encoded_line = self.tokenizer.encode(self.pre_tokenize(line), add_special_tokens=True, truncation=True)
-            return encoded_line
-        else:
-            text = [tok.text for tok in self.tokenizer.tokenizer(line) if tok.text != '']
-        return text
+
+        encoded_line = self.tokenizer.encode(self.pre_tokenize(line), add_special_tokens=True, truncation=True)
+        return encoded_line
 
     def read_csv_file(self, path, train, func=None):
         assert os.path.exists(path)
@@ -97,9 +86,9 @@ class Vocab(object):
 
     def load_vocab(self,
                    vocab_file):
-        with open(vocab_file, "rb") as f:
+        with open(vocab_file, "r", encoding='utf8') as f:
             for idx, word in enumerate(f):
-                self.worddict[word] = idx
+                self.worddict[word[:-1]] = idx
 
     def build_worddict(self, c, r, l):
 
@@ -119,9 +108,11 @@ class Vocab(object):
         # for t in self.special:
         #     self.worddict[t] = offset
         #     offset += 1
+        n_tokens = len(self.worddict)
         for i, word in enumerate(counts.most_common(num_words)):
             if word not in self.worddict:
-                self.worddict[word[0]] = i + self.offset
+                self.worddict[word[0]] = n_tokens
+                n_tokens += 1
 
     def words_to_indices(self, text):
         """
@@ -168,10 +159,34 @@ class Vocab(object):
             for x in d:
                 data_indices_str.append(list(map(str, x)))
         w2v_model = Word2Vec(data_indices_str, size=300, window=5, min_count=5,
-                             sg=1, epoch=5,
-                             workers=multiprocessing.cpu_count())
+                             sg=1, workers=multiprocessing.cpu_count())
         return w2v_model
 
+    def build_embed_layer(self, embeddings_file):
+        embed_dict = {}
+        with open(embeddings_file, "r", encoding="utf8") as f:
+            for idx, line in enumerate(f):
+                if idx == 0: continue
+                line = line.split()
+                try:
+                    float(line[1])
+                    word = line[0]
+                    if word in self.worddict:
+                        embed_dict[word] = line[1:]
+                except ValueError:
+                    continue
+            n_token = len(self.worddict)
+            embed_dim = len(list(embed_dict.values())[0])
+            embed_matrix = np.zeros((n_token, embed_dim))
+            for word, i in self.worddict.items():
+                if str(i) in embed_dict:
+                    embed_matrix[i] = np.array(embed_dict[str(i)], dtype=float)
+                else:
+                    if word == "[PAD]":
+                        continue
+
+                    embed_matrix[i] = np.random.normal(size=(embed_dim))
+        return embed_matrix
     # https://github.com/coetaur0/ESIM/blob/65611601ff9f17f76e1f246e8e46b5fc4bee13fc/esim/data.py
     def build_embedding_matrix(self, embeddings_file):
         """
@@ -264,12 +279,16 @@ class UbuntuCorpus(Dataset):
                 self.dump(self.data, s_path)
         if type == 'train':
             if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
-            emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.model'])
-            if not os.path.exists(emb_path):
+            emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.txt'])
+            bert_emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
+            if not os.path.exists(bert_emb_path):
                 self.embeddings = self.Vocab.train_word2vec(self.data)
-                self.embeddings.save(emb_path)
+                self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
+                self.embeddings = self.Vocab.build_embed_layer(emb_path)
+                np.save(bert_emb_path, self.embeddings)
             else:
-                self.embeddings = Word2Vec.load(emb_path) # offset = 4
+                self.embeddings = np.load(bert_emb_path)
+                # self.embeddings = Word2Vec.load(emb_path) # offset = 4
 
 
 
@@ -338,8 +357,6 @@ def padding(seqs, seq_lens):
 
 if __name__ == '__main__':
 
-
-    import torchtext
     path = '/remote_workspace/dataset/default/valid.csv'
     train_path = '/remote_workspace/dataset/default/train.csv'
     save_path = '/remote_workspace/rs_trans/data/bert'
