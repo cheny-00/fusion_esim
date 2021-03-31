@@ -125,7 +125,7 @@ class Vocab(object):
             if word in self.worddict:
                 index = self.worddict[word]
             else:
-                index = self.worddict["__oov__"]
+                index = self.worddict["[UNK]"]
             indices.append(index)
         return indices
 
@@ -158,7 +158,7 @@ class Vocab(object):
         for d in data[:2]:
             for x in d:
                 data_indices_str.append(list(map(str, x)))
-        w2v_model = Word2Vec(data_indices_str, size=300, window=5, min_count=5,
+        w2v_model = Word2Vec(data_indices_str, vector_size=300, window=5, min_count=5,
                              sg=1, workers=multiprocessing.cpu_count())
         return w2v_model
 
@@ -261,29 +261,26 @@ class UbuntuCorpus(Dataset):
                 self.data = self.Vocab.read_csv_file(path=path, train=False)
 
 
-            if 'bert' in kwargs['model_name']:
-                self.dump(self.data, s_path)
+            # word2vec
+            wordict_path = os.path.join(save_path, 'worddict')
+            if os.path.exists(wordict_path):
+                self.Vocab.worddict = self.load(wordict_path)
             else:
-                # word2vec
-                wordict_path = os.path.join(save_path, 'worddict')
-                if os.path.exists(wordict_path):
-                    self.Vocab.worddict = self.load(wordict_path)
-                else:
-                    if type == 'train':
-                        self.Vocab.build_worddict(*self.data)
-                        self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
-                # build_worddict first
-                assert self.Vocab.worddict != {}
-                self.data = self.Vocab.file_to_indices(data=self.data,
-                                                       train=type == 'train')
-                self.dump(self.data, s_path)
+                if type == 'train':
+                    self.Vocab.build_worddict(*self.data)
+                    self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
+            # build_worddict first
+            assert self.Vocab.worddict != {}
+            self.data = self.Vocab.file_to_indices(data=self.data,
+                                                   train=type == 'train')
+            self.dump(self.data, s_path)
         if type == 'train':
             if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
             emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.txt'])
             bert_emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
             if not os.path.exists(bert_emb_path):
-                self.embeddings = self.Vocab.train_word2vec(self.data)
-                self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
+                #self.embeddings = self.Vocab.train_word2vec(self.data)
+                #self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
                 self.embeddings = self.Vocab.build_embed_layer(emb_path)
                 np.save(bert_emb_path, self.embeddings)
             else:

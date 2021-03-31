@@ -16,6 +16,4 @@ python3 ../fusion_run.py \
     --cuda              \
     --model_name bert \
     --dataset_path /remote_workspace/dataset/default \
-    --examples_path /remote_workspace/fusion_esim/data/examples \
-    --fp16 \
-    --opt_level O2
+    --examples_path /remote_workspace/fusion_esim/data/examples 

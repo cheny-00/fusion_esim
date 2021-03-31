@@ -2,7 +2,6 @@ import os
 import time
 import torch
 import torch.nn as nn
-from apex import amp
 from eval.evaluation import eval_samples
 from utils import get_mask_from_seq_lens
 class Trainer:
