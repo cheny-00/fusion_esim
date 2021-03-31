@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="fe7f0ef9-59fe-41c5-8719-2f251dc13a4a" name="fusi">
+        <fileTransfer accessType="SFTP" host="ma2080.chy.moe" port="9122" sshConfigId="57224ca8-fd96-4763-ad72-ee3e7edf119e" sshConfig="root@ma2080.chy.moe:9122 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
