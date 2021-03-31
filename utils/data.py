@@ -35,6 +35,7 @@ class Vocab(object):
         self.worddict = worddict
         if bert_path:
             self.load_vocab(os.path.join(bert_path, 'vocab.txt'))
+            self_n_bert_token = len(self.worddict)
         self.progress = Progress(
             TextColumn("[bold blue]{task.fields[dataset]}", justify="right"),
             BarColumn(bar_width=100, style="black on white"),

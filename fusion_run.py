@@ -57,7 +57,6 @@ def main(args):
                                 save_path=args.examples_path,
                                 model_name=model_name,
                                 special=['__eou__', '__eot__'],
-                                bert_path=args.bert_path,
                                 worddict=train_dataset.Vocab.worddict)
     train_iter = DataLoader(train_dataset,
                             batch_size=args.batch_size,
@@ -102,6 +101,7 @@ def main(args):
         if args.model == 'fusion_esim':
             model = fusion_esim.FusionEsim(BERT=bert,
                                            bert_dim=bert_config['hidden_size'],
+                                           n_bert_token=train_dataset.Vocab.n_bert_token,
                                            n_token=-1,
                                            input_size=args.d_embed,
                                            hidden_size=args.d_model,
@@ -109,7 +109,6 @@ def main(args):
                                            dropatt=args.dropatt,
                                            embeddings=embedding_layer,
                                            n_layer=args.n_layer)
-
 
     if args.optim.lower() == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.lr,

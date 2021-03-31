@@ -143,10 +143,12 @@ class Bert(nn.Module):
     def __init__(self,
                  BERT,
                  bert_dim=768,
+                 n_bert_token=0,
                  dropout=0.5):
         super(Bert, self).__init__()
         self.BERT = BERT
         self.drop = nn.Dropout(dropout)
+        self.n_bert_token = n_bert_token - 1
         self._classifier = nn.Sequential(self.drop,
                                          nn.Linear(bert_dim * 4, bert_dim),
                                          nn.Tanh(),
@@ -154,9 +156,10 @@ class Bert(nn.Module):
                                          nn.Linear(bert_dim, 2))
 
     def forward(self, c, c_len, r, r_len):
+        SEP, UNK = 102, 100
         c_len, r_len = c_len.cuda(), r_len.cuda()
-
-        SEP = 102
+        c, r = c.masked_fill(c > self.n_bert_token, torch.tensor(UNK)), \
+               r.masked_fill(r > self.n_bert_token, torch.tensor(UNK))
         c_mask = get_mask_from_seq_lens(c_len)
         convert_pad = torch.ones_like(c) * SEP * torch.logical_not(c_mask)
         c += convert_pad
@@ -184,10 +187,12 @@ class FusionEsim(nn.Module):
     def __init__(self,
                  BERT,
                  bert_dim=768,
+                 n_bert_token=0,
                  **kwargs):
         self.ESIM = ESIM_like(**kwargs)
         self.Bert = Bert(BERT,
                          bert_dim,
+                         n_bert_token,
                          kwargs['dropout'])
         self.crit = nn.CrossEntropyLoss()
     def forward(self,
