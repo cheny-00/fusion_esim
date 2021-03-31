@@ -57,7 +57,8 @@ def main(args):
                                 save_path=args.examples_path,
                                 model_name=model_name,
                                 special=['__eou__', '__eot__'],
-                                worddict=train_dataset.Vocab.worddict)
+                                worddict=train_dataset.Vocab.worddict,
+                                bert_path=args.bert_path)
     train_iter = DataLoader(train_dataset,
                             batch_size=args.batch_size,
                             collate_fn=ub_corpus_train_collate_fn,
@@ -80,7 +81,7 @@ def main(args):
     ## Build Bert model
     if 'bert' in model_name:
         bert_config = BertConfig.from_json_file(os.path.join(args.bert_path,
-                                                             'bert_config.json'))
+                                                             'config.json'))
         ModelClass = BertModel
     elif 'distilbert' in model_name:
         ModelClass = DistilBertModel
@@ -100,14 +101,14 @@ def main(args):
     else:
         if args.model == 'fusion_esim':
             model = fusion_esim.FusionEsim(BERT=bert,
-                                           bert_dim=bert_config['hidden_size'],
+                                           bert_dim=512,
                                            n_bert_token=train_dataset.Vocab.n_bert_token,
                                            n_token=-1,
                                            input_size=args.d_embed,
                                            hidden_size=args.d_model,
                                            dropout=args.dropout,
                                            dropatt=args.dropatt,
-                                           embeddings=embedding_layer,
+                                           embedding_layer=embedding_layer,
                                            n_layer=args.n_layer)
 
     if args.optim.lower() == 'sgd':

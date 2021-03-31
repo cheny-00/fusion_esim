@@ -189,6 +189,7 @@ class FusionEsim(nn.Module):
                  bert_dim=768,
                  n_bert_token=0,
                  **kwargs):
+        super(FusionEsim, self).__init__()
         self.ESIM = ESIM_like(**kwargs)
         self.Bert = Bert(BERT,
                          bert_dim,
