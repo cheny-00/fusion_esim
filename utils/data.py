@@ -20,7 +20,6 @@ from rich.progress import (
     TimeRemainingColumn,
     TimeElapsedColumn,
 )
-import spacy
 from collections import Counter
 from gensim.models import Word2Vec
 import multiprocessing
