@@ -3,6 +3,6 @@ test*
 */__pycache__
 .gitignore
 .idea
-!data/
+data/
 logs/
 checkpoints/
