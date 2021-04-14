@@ -200,10 +200,10 @@ class FusionEsim(nn.Module):
     def forward(self,
                 *inp):
         esim_logit = self.ESIM(*inp)
-        if 1:
+        if 0:
             bert_logit = self.Bert(*inp)
         else:
-            bert_logit = None
+            bert_logit = 0
 
         return esim_logit, bert_logit
 

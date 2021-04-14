@@ -180,8 +180,8 @@ class Trainer:
                                               context[1].cpu(),
                                               response[0].to(device),
                                               response[1].cpu())
-            loss = self.crit(x_1_logit, label.to(device))  + \
-                   self.crit(x_2_logit, label.to(device))
+            loss = self.crit(x_1_logit, label.to(device))  #+ \
+                #    self.crit(x_2_logit, label.to(device))
 
             if self.fp16:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
@@ -191,11 +191,11 @@ class Trainer:
                 loss.backward()
                 nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
             self.optimizer.step()
-            if 'scheduler' and 'warmup_step' in kwargs:
-                scheduler = kwargs['scheduler']
-                warmup_step = kwargs['warmup_step']
-                if self.train_step < warmup_step:
-                    scheduler.step()
+            # if 'scheduler' and 'warmup_step' in kwargs:
+            #     scheduler = kwargs['scheduler']
+            #     warmup_step = kwargs['warmup_step']
+            #     if self.train_step < warmup_step:
+            #         scheduler.step()
             self.train_loss += loss.float().item()
 
             if self.train_step % self.log_interval == 0:
