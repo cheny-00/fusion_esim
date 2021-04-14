@@ -174,12 +174,13 @@ class Trainer:
                 continue
             self.optimizer.zero_grad()
             self.train_step += 1
+            label = torch.tensor(label, dtype=torch.long)
 
             x_1_logit, x_2_logit = self.model(context[0].to(device),
                                               context[1].cpu(),
                                               response[0].to(device),
                                               response[1].cpu())
-            loss = self.crit(x_1_logit, label.to(device)) + \
+            loss = self.crit(x_1_logit, label.to(device))  + \
                    self.crit(x_2_logit, label.to(device))
 
             if self.fp16:
