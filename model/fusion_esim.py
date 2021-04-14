@@ -158,8 +158,8 @@ class Bert(nn.Module):
     def forward(self, c, c_len, r, r_len):
         SEP, UNK = 102, 100
         c_len, r_len = c_len.cuda(), r_len.cuda()
-        c, r = c.masked_fill(c > self.n_bert_token, torch.tensor(UNK)), \
-               r.masked_fill(r > self.n_bert_token, torch.tensor(UNK))
+        # c, r = c.masked_fill(c > self.n_bert_token, torch.tensor(UNK)), \
+        #        r.masked_fill(r > self.n_bert_token, torch.tensor(UNK))
         c_mask = get_mask_from_seq_lens(c_len)
         convert_pad = torch.ones_like(c) * SEP * torch.logical_not(c_mask)
         c += convert_pad
