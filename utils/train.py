@@ -62,10 +62,9 @@ class Trainer:
         device = self.device
         log_start_time = 0
         for batch, (context, response, label) in enumerate(self.train_iter):
-
             if len(label) != self.batch_size:
                 continue
-            elif not set(label.tolist()) == set([0, 1]):
+            elif not set(list(label)) == set([0, 1]):
                 continue
             self.optimizer.zero_grad()
             self.train_step += 1
@@ -171,7 +170,7 @@ class Trainer:
         for batch, (context, response, label) in enumerate(self.train_iter):
             if len(label) != self.batch_size:
                 continue
-            elif not set(label.tolist()) == set([0, 1]):
+            elif not set(list(label)) == set([0, 1]):
                 continue
             self.optimizer.zero_grad()
             self.train_step += 1

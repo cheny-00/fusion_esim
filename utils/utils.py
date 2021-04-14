@@ -82,7 +82,7 @@ def weighted_sum(tensor, weights, mask):
         has been applied on it.
     """
     weighted_sum = weights.bmm(tensor)
-    if not mask: return weighted_sum
+    if mask == None: return weighted_sum
 
     while mask.dim() < weighted_sum.dim():
         mask = mask.unsqueeze(1)
