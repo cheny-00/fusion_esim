@@ -81,7 +81,7 @@ class ESIM_like(nn.Module):
         else:
             c_mask, r_mask = None, None
 
-        context_embed, response_embed = self.embedding(context), self.embedding(response)
+        context_embed, response_embed = self.embedding(context.clone().detach()), self.embedding(response.clone().detach())
         # context_embed, response_embed = self.emb_ln_c(context), self.emb_ln_r(response)
 
         # word level
@@ -150,13 +150,14 @@ class Bert(nn.Module):
         self.drop = nn.Dropout(dropout)
         self.n_bert_token = n_bert_token - 1
         self._classifier = nn.Sequential(self.drop,
-                                         nn.Linear(bert_dim * 4, bert_dim),
+                                         nn.Linear(bert_dim, bert_dim),
                                          nn.Tanh(),
                                          self.drop,
                                          nn.Linear(bert_dim, 2))
 
     def forward(self, c, c_len, r, r_len):
         SEP, UNK = 102, 100
+        c, r = c.clone().detach(), r.clone().detach()
         c_len, r_len = c_len.cuda(), r_len.cuda()
         # c, r = c.masked_fill(c > self.n_bert_token, torch.tensor(UNK)), \
         #        r.masked_fill(r > self.n_bert_token, torch.tensor(UNK))
@@ -186,7 +187,7 @@ class FusionEsim(nn.Module):
 
     def __init__(self,
                  BERT,
-                 bert_dim=768,
+                 bert_dim=512,
                  n_bert_token=0,
                  **kwargs):
         super(FusionEsim, self).__init__()
@@ -199,10 +200,10 @@ class FusionEsim(nn.Module):
     def forward(self,
                 *inp):
         esim_logit = self.ESIM(*inp)
-        if 1:
+        if 0:
             bert_logit = self.Bert(*inp)
         else:
-            bert_logit = None
+            bert_logit = 0
 
         return esim_logit, bert_logit
 

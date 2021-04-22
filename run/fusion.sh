@@ -10,7 +10,7 @@ python3 ../fusion_run.py \
     --optim adam    \
     --lr 0.0004    \
     --eta_min 0.00003 \
-    --scheduler cosine_warm_up \
+    --scheduler dev_perf \
     --warmup_step 8100 \
     --epochs 64 \
     --cuda              \

@@ -62,10 +62,9 @@ class Trainer:
         device = self.device
         log_start_time = 0
         for batch, (context, response, label) in enumerate(self.train_iter):
-
             if len(label) != self.batch_size:
                 continue
-            elif not set(label.tolist()) == set([0, 1]):
+            elif not set(list(label)) == set([0, 1]):
                 continue
             self.optimizer.zero_grad()
             self.train_step += 1
@@ -171,17 +170,18 @@ class Trainer:
         for batch, (context, response, label) in enumerate(self.train_iter):
             if len(label) != self.batch_size:
                 continue
-            elif not set(label.tolist()) == set([0, 1]):
+            elif not set(list(label)) == set([0, 1]):
                 continue
             self.optimizer.zero_grad()
             self.train_step += 1
+            label = torch.tensor(label, dtype=torch.long)
 
             x_1_logit, x_2_logit = self.model(context[0].to(device),
                                               context[1].cpu(),
                                               response[0].to(device),
                                               response[1].cpu())
-            loss = self.crit(x_1_logit, label.to(device)) + \
-                   self.crit(x_2_logit, label.to(device))
+            loss = self.crit(x_1_logit, label.to(device))  #+ \
+                #    self.crit(x_2_logit, label.to(device))
 
             if self.fp16:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
@@ -191,11 +191,11 @@ class Trainer:
                 loss.backward()
                 nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
             self.optimizer.step()
-            if 'scheduler' and 'warmup_step' in kwargs:
-                scheduler = kwargs['scheduler']
-                warmup_step = kwargs['warmup_step']
-                if self.train_step < warmup_step:
-                    scheduler.step()
+            # if 'scheduler' and 'warmup_step' in kwargs:
+            #     scheduler = kwargs['scheduler']
+            #     warmup_step = kwargs['warmup_step']
+            #     if self.train_step < warmup_step:
+            #         scheduler.step()
             self.train_loss += loss.float().item()
 
             if self.train_step % self.log_interval == 0:
