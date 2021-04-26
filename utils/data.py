@@ -6,6 +6,7 @@ import dill
 from functools import partial, reduce
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
+from collections import Counter
 from transformers import (
     BertModel,
     BertTokenizer,
@@ -20,7 +21,7 @@ from rich.progress import (
     TimeRemainingColumn,
     TimeElapsedColumn,
 )
-from collections import Counter
+import spacy
 from gensim.models import Word2Vec
 import multiprocessing
 
@@ -55,36 +56,45 @@ class Vocab(object):
             self.tokenizer = BertTokenizer.from_pretrained(bert_path if bert_path else model_name,
                                                            do_lower_case=lower_case)
             self.n_bert_token = self.tokenizer.vocab_size
+
+        self.w2v_tokenizer = spacy.load("en_core_web_sm")
+
     def pre_tokenize(self, line):
         for token in self.special:
             line = line.replace(token, "")
         return line
-
     def tokenize(self, line): #TODO remove special tokens, split turn
 
         encoded_line = self.tokenizer.encode(self.pre_tokenize(line), add_special_tokens=True, truncation=True)
         # TODO add_special_tokens & truncation
         return encoded_line
 
-    def read_csv_file(self, path, train, func=None):
+    def w2v_tokenize(self, line):
+        text = [tok.text for tok in self.w2v_tokenizer.tokenizer(self.pre_tokenize(line)) if tok.text != '']
+        return text
+
+    def read_csv_file(self, path, train, func=None, w2v_f = None):
         assert os.path.exists(path)
         if not func:
             func = self.tokenize
+        if not w2v_f:
+            w2v_f = self.w2v_tokenize
         type = 'train' if train else 'valid or test'
         task = self.progress.add_task(type, dataset="UbuntuCorpus/{}".format(type), start=False)
         f = pd.read_csv(path)
         header = f.columns
-        context = f[header[0]].tolist()
-        response = f[header[1]].tolist()
+        context = f[header[0]].tolist()[:50]
+        response = f[header[1]].tolist()[:50]
         if train:
-            label = f[header[2]]
+            label = f[header[2]][:50]
             data = (context, response, label)
-            # self.build_worddict(*data)
         else:
             neg_samples = header[2:]
             neg_data = [f[neg].tolist() for neg in neg_samples]
             data = (context, response, neg_data)
-        return self.iter_data(data, task, train, func)
+        b_data = self.iter_data(data, task, train, func)
+        w2v_data = self.iter_data(data, task, train, w2v_f)
+        return (w2v_data, b_data)
 
     def load_vocab(self,
                    vocab_file):
@@ -97,45 +107,45 @@ class Vocab(object):
         [words.extend(sentence) for sentence in c]
         [words.extend(sentence) for sentence in r]
         return words
-    # def build_worddict(self, c, r, l):
 
-    #     words = self.get_word(c, r, l) # TODO need to add words from train set when test
+    def build_worddict(self, c, r, l):
 
-    #     counts = Counter(words)
-    #     num_words = len(counts)
-    #     self.offset = 0
+        words = self.get_word(c, r, l) # TODO need to add words from train set when test
 
-    #     # self.worddict["__pad__"] = 0
-    #     # self.worddict["__oov__"] = 1
-    #     #
-    #     # for t in self.special:
-    #     #     self.worddict[t] = offset
-    #     #     offset += 1
-    #     n_tokens = len(self.worddict)
-    #     for i, word in enumerate(counts.most_common(num_words)):
-    #         if word[0] not in self.worddict:
-    #             self.worddict[word[0]] = n_tokens
-    #             n_tokens += 1
-    #             # self.tokenizer.add_tokens([word[0]])
+        counts = Counter(words)
+        num_words = len(counts)
+        self.offset = 0
 
-    # def words_to_indices(self, text):
-    #     """
-    #     transform sentence to indices
-    #     :param text: sentence
-    #     :return: list of indices
-    #     """
-    #     indices = []
-    #     for word in text:
-    #         if word in self.worddict:
-    #             index = self.worddict[word]
-    #         else:
-    #             index = self.worddict["[UNK]"]
-    #         indices.append(index)
-    #     return indices
+        self.worddict["[PAD]"] = 0
+        self.worddict["[UNK]"] = 1
+        #
+        # for t in self.special:
+        #     self.worddict[t] = offset
+        #     offset += 1
+        n_tokens = len(self.worddict)
+        for i, word in enumerate(counts.most_common(num_words)):
+            if word[0] not in self.worddict:
+                self.worddict[word[0]] = n_tokens
+                n_tokens += 1
 
-    # def file_to_indices(self, data, train):
-    #     task = self.progress.add_task("test", dataset="word2indices", start=False)
-    #     return self.iter_data(data, task, train, self.words_to_indices)
+    def words_to_indices(self, text):
+        """
+        transform sentence to indices
+        :param text: sentence
+        :return: list of indices
+        """
+        indices = []
+        for word in text:
+            if word in self.worddict:
+                index = self.worddict[word]
+            else:
+                index = self.worddict["[UNK]"]
+            indices.append(index)
+        return indices
+
+    def file_to_indices(self, data, train):
+        task = self.progress.add_task("test", dataset="word2indices", start=False)
+        return self.iter_data(data, task, train, self.words_to_indices)
 
     def iter_data(self, data, task, train, func):
         c, r = data[0], data[1]
@@ -162,7 +172,7 @@ class Vocab(object):
         for d in data[:2]:
             for x in d:
                 data_indices_str.append(list(map(str, x)))
-        w2v_model = Word2Vec(data_indices_str, vector_size=300, window=5, min_count=5,
+        w2v_model = Word2Vec(data_indices_str, size=300, window=5, min_count=5,
                              sg=1, workers=multiprocessing.cpu_count())
         return w2v_model
 
@@ -249,6 +259,7 @@ class Vocab(object):
 class UbuntuCorpus(Dataset):
 
     def __init__(self, path, type, save_path, **kwargs):
+
         self.path = path
         self.type = type
         self.dataset = None
@@ -257,48 +268,65 @@ class UbuntuCorpus(Dataset):
         assert os.path.exists(save_path)
         s_path = os.path.join(save_path, type)
         self.data = self.load_data(s_path)
+        wordict_path = os.path.join(save_path, 'worddict')
 
         if not self.data:
-            self.data = self.Vocab.read_csv_file(path=path, train=(type=='train'))
+            w2v_data, b_data = self.Vocab.read_csv_file(path=path, train=(type=='train')) # (w2v, bert)
             # word2vec
-            # wordict_path = os.path.join(save_path, 'worddict')
-            # if os.path.exists(wordict_path):
-            #     self.Vocab.worddict = self.load(wordict_path)
-            # elif type == 'train' and self.Vocab.worddict:
-            #         self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
-            # # build_worddict first
-            # assert self.Vocab.worddict != {}
+            if os.path.exists(wordict_path):
+                self.Vocab.worddict = self.load(wordict_path)
+            elif type == 'train' and self.Vocab.worddict:
+                self.Vocab.build_worddict(*w2v_data)
+                self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
+            # build_worddict first
+            assert self.Vocab.worddict, 'make suere worddict exist'
+            w2v_data = self.Vocab.file_to_indices(data=w2v_data,
+                                                  train=type=='train')
+            self.data = (w2v_data, b_data)
             self.dump(self.data, s_path)
         if type == 'train':
-            # if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
+             # if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
             emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.txt'])
-            bert_emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
+            # bert_emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
+            if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
+            # if not os.path.exists(emb_path):
+            #     self.embeddings = self.Vocab.train_word2vec(w2v_data)
+            #     self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
+            # if not os.path.exists(bert_emb_path):
+            #     self.embeddings = self.Vocab.build_embed_layer(emb_path)
+            #     np.save(bert_emb_path, self.embeddings)
+            # else:
+            #     self.embeddings = np.load(bert_emb_path)
             if not os.path.exists(emb_path):
-                self.embeddings = self.Vocab.train_word2vec(self.data)
-                self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
-            if not os.path.exists(bert_emb_path):
-                self.embeddings = self.Vocab.build_embed_layer(emb_path)
-                np.save(bert_emb_path, self.embeddings)
+                self.embeddings = self.Vocab.train_word2vec(self.data[0])
+                self.embeddings.save(emb_path)
             else:
-                self.embeddings = np.load(bert_emb_path)
-                # self.embeddings = Word2Vec.load(emb_path) # offset = 4
+                self.embeddings = Word2Vec.load(emb_path) # offset = 4
 
 
 
     def __len__(self):
-        return len(self.data[0])
-
+        return len(self.data[0][0])
+    @staticmethod
+    def get_item(idx, data, train):
+        if train:
+            return (torch.tensor(data[0][idx], dtype=torch.long), len(data[0][idx])),\
+                   (torch.tensor(data[1][idx], dtype=torch.long), len(data[1][idx])),\
+                   data[2][idx]
+        else:
+            n_sample = len(data[2])
+            neg_line = []
+            for neg in range(n_sample):
+                neg_line.append((torch.tensor(data[2][neg][idx]), len(data[2][neg][idx])))
+            return (torch.tensor(data[0][idx]), len(data[0][idx])),\
+                   (torch.tensor(data[1][idx]), len(data[1][idx])),\
+                   neg_line
     def __getitem__(self, idx):
         # input : context, response, label/ neg_samples
         # output: (context, context_len), (response, response_len), ...
-        if self.type == 'train':
-            return (torch.tensor(self.data[0][idx], dtype=torch.long), len(self.data[0][idx])), (torch.tensor(self.data[1][idx], dtype=torch.long), len(self.data[1][idx])), self.data[2][idx]
-        else:
-            n_sample = len(self.data[2])
-            neg_line = []
-            for neg in range(n_sample):
-                neg_line.append((torch.tensor(self.data[2][neg][idx]), len(self.data[2][neg][idx])))
-            return (torch.tensor(self.data[0][idx]), len(self.data[0][idx])), (torch.tensor(self.data[1][idx]), len(self.data[1][idx])), neg_line
+        w2v_data, b_data = self.data[0], self.data[1]
+        return (self.get_item(idx, w2v_data, self.type=='train'),
+                self.get_item(idx, b_data, self.type=='train'))
 
     def dump(self, data, path):
         with open(path, 'wb') as f:
@@ -317,12 +345,15 @@ class UbuntuCorpus(Dataset):
 
 
 def ub_corpus_train_collate_fn(data):
+    if len(data) == 2:
+        return (ub_corpus_train_collate_fn(data[0]), ub_corpus_train_collate_fn(data[1]))
     t_c, t_r, label = zip(*data)
     padded_c, padded_r = padding(*zip(*t_c)), padding(*zip(*t_r))
     return padded_c, padded_r, label
 
 def ub_corpus_test_collate_fn(data):
-
+    if len(data) == 2:
+        return (ub_corpus_test_collate_fn(data[0]), ub_corpus_test_collate_fn(data[1]))
     # data : [((c, c_l), (r, r_l), ((neg_1, neg_1_l), ...(neg_n, neg_n_l))) * batch_size]
     t_c, t_r, n_s = zip(*data)
     neg = list(zip(*n_s)) # transpose n_s
