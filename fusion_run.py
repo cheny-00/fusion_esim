@@ -112,8 +112,7 @@ def main(args):
                                            n_layer=args.n_layer)
 
     if args.optim.lower() == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr,
-            momentum=args.mom)
+        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.mom)
     elif args.optim.lower() == 'adam':
             optimizer = optim.Adam(model.parameters(), lr=args.lr)
     elif args.optim.lower() == 'adagrad':
@@ -125,7 +124,8 @@ def main(args):
         # because in previous versions eta_min is default to 0
         # rather than the default value of lr_min 1e-6
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,
-            args.epochs // 4, eta_min=args.eta_min) # should use eta_min arg
+                                                         args.epochs // 4,
+                                                         eta_min=args.eta_min) # should use eta_min arg
     elif args.scheduler == 'inv_sqrt':
         # originally used for Transformer (in Attention is all you need)
         def lr_lambda(step):
@@ -134,17 +134,20 @@ def main(args):
                 return 1.
             else:
                 return 1. / (step ** 0.5) if step > args.warmup_step \
-                       else step / (args.warmup_step ** 1.5)
+                    else step / (args.warmup_step ** 1.5)
         scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
     elif args.scheduler == 'dev_perf':
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',
-            factor=args.decay_rate, patience=args.patience, min_lr=args.lr_min)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                         mode='max',
+                                                         factor=args.decay_rate,
+                                                         patience=args.patience,
+                                                         min_lr=args.lr_min)
     elif args.scheduler == 'cosine_warm_up':
         total_step = len(train_dataset) // args.batch_size * max(5, args.epochs)
         warmup_step = total_step // 10
-        scheduler = get_linear_schedule_with_warmup(
-           optimizer, num_warmup_steps=warmup_step, num_training_steps=total_step
-        )
+        scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                    num_warmup_steps=warmup_step,
+                                                    num_training_steps=total_step)
     elif args.scheduler == 'constant':
         pass
 

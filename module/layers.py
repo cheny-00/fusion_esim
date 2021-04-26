@@ -111,6 +111,7 @@ class RNN_encoder(nn.Module):
 
 
     def forward(self, inp, inp_len):
+        if not inp_len: return self._encoder(inp)
         packed_batch = nn.utils.rnn.pack_padded_sequence(inp,
                                                          inp_len,
                                                          batch_first=self.batch_first,

@@ -14,6 +14,7 @@ class ESIM_like(nn.Module):
                  dropout,
                  dropatt,
                  n_layer,
+                 bert_embeddings,
                  embedding_layer,
                  ismasked=True):
         super(ESIM_like, self).__init__()
@@ -29,8 +30,12 @@ class ESIM_like(nn.Module):
 
         self.rnn_drop = RNNDropout(p=self.dropout)
         # word emb
+        self.bert_embeddings = bert_embeddings
         self.embedding = embedding_layer
 
+        # combine embeddings
+        self.combine_inp = nn.Sequential(nn.Linear(self.bert_embeddings.embedding_dim + self.embedding.embedding_dim,
+                                                   self.input_size),)
         # word level
         self.token_enc = RNN_encoder(nn.LSTM,
                                      input_size=self.input_size,
@@ -72,16 +77,23 @@ class ESIM_like(nn.Module):
         # Initialize all weights and biases in the model.
         self.apply(_init_weights)
 
-    def forward(self, context, context_len, response, response_len):
+    def forward(self, w2v_data, b_data):
+        inp = tuple(zip(*(w2v_data, b_data))) # c, c_l, r, r_l
+        context_len, response_len = None, None
+        w2v_c, w2v_r = self.embedding(inp[0][0].clone().detach()), self.embedding(inp[2][0].clone().detach())
+        bert_c, bert_r = self.bert_embeddings(inp[0][1].clone().detach()), self.bert_embeddings(inp[2][1].clone().detach())
+
+        context_embed, response_embed = self.combine_inp(torch.cat((w2v_c, bert_c), dim=-1)),\
+                                        self.combine_inp(torch.cat((w2v_r, bert_r), dim=-1))
 
         # word embed
-        if self.ismasked:
+        if not self.ismasked:
             c_mask = get_mask_from_seq_lens(context_len).cuda()
             r_mask = get_mask_from_seq_lens(response_len).cuda()
         else:
             c_mask, r_mask = None, None
 
-        context_embed, response_embed = self.embedding(context.clone().detach()), self.embedding(response.clone().detach())
+        # context_embed, response_embed = self.embedding(context.clone().detach()), self.embedding(response.clone().detach())
         # context_embed, response_embed = self.emb_ln_c(context), self.emb_ln_r(response)
 
         # word level
@@ -191,17 +203,18 @@ class FusionEsim(nn.Module):
                  n_bert_token=0,
                  **kwargs):
         super(FusionEsim, self).__init__()
-        self.ESIM = ESIM_like(**kwargs)
+        self.ESIM = ESIM_like(bert_embeddings=BERT.embeddings.word_embeddings, **kwargs)
         self.Bert = Bert(BERT,
                          bert_dim,
                          n_bert_token,
                          kwargs['dropout'])
         self.crit = nn.CrossEntropyLoss()
     def forward(self,
-                *inp):
-        esim_logit = self.ESIM(*inp)
+                w2v,
+                br):
+        esim_logit = self.ESIM(w2v, br)
         if 0:
-            bert_logit = self.Bert(*inp)
+            bert_logit = self.Bert(*br)
         else:
             bert_logit = 0
 

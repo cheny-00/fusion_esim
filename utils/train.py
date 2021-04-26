@@ -167,7 +167,8 @@ class Trainer:
         self.model.train()
         device = self.device
         log_start_time = 0
-        for batch, (context, response, label) in enumerate(self.train_iter):
+        for batch, data in enumerate(self.train_iter):
+            w2v_data, b_data, label = data[0], data[1], data[0][2]
             if len(label) != self.batch_size:
                 continue
             elif not set(list(label)) == set([0, 1]):
@@ -176,10 +177,8 @@ class Trainer:
             self.train_step += 1
             label = torch.tensor(label, dtype=torch.long)
 
-            x_1_logit, x_2_logit = self.model(context[0].to(device),
-                                              context[1].cpu(),
-                                              response[0].to(device),
-                                              response[1].cpu())
+            x_1_logit, x_2_logit = self.model(w2v_data,
+                                              b_data)
             loss = self.crit(x_1_logit, label.to(device))  #+ \
                 #    self.crit(x_2_logit, label.to(device))
 

@@ -33,9 +33,6 @@ class Vocab(object):
                  worddict={}):
 
         self.worddict = worddict
-        if bert_path:
-            self.load_vocab(os.path.join(bert_path, 'vocab.txt'))
-            self_n_bert_token = len(self.worddict)
         self.progress = Progress(
             TextColumn("[bold blue]{task.fields[dataset]}", justify="right"),
             BarColumn(bar_width=100, style="black on white"),
@@ -83,10 +80,10 @@ class Vocab(object):
         task = self.progress.add_task(type, dataset="UbuntuCorpus/{}".format(type), start=False)
         f = pd.read_csv(path)
         header = f.columns
-        context = f[header[0]].tolist()[:50]
-        response = f[header[1]].tolist()[:50]
+        context = f[header[0]].tolist()
+        response = f[header[1]].tolist()
         if train:
-            label = f[header[2]][:50]
+            label = f[header[2]]
             data = (context, response, label)
         else:
             neg_samples = header[2:]
@@ -96,11 +93,6 @@ class Vocab(object):
         w2v_data = self.iter_data(data, task, train, w2v_f)
         return (w2v_data, b_data)
 
-    def load_vocab(self,
-                   vocab_file):
-        with open(vocab_file, "r", encoding='utf8') as f:
-            for idx, word in enumerate(f):
-                self.worddict[word[:-1]] = idx
 
     def get_word(self, c, r, l):
         words = []
@@ -196,9 +188,7 @@ class Vocab(object):
                 if str(i) in embed_dict:
                     embed_matrix[i] = np.array(embed_dict[str(i)], dtype=float)
                 else:
-                    if word == "[PAD]":
-                        continue
-
+                    if word == "[PAD]": continue
                     embed_matrix[i] = np.random.normal(size=(embed_dim))
         return embed_matrix
     # https://github.com/coetaur0/ESIM/blob/65611601ff9f17f76e1f246e8e46b5fc4bee13fc/esim/data.py
@@ -244,7 +234,7 @@ class Vocab(object):
             if word in embeddings:
                 embedding_matrix[i] = np.array(embeddings[word], dtype=float)
             else:
-                if word == "_PAD_":
+                if word == "[PAD]":
                     continue
                 missed += 1
                 # Out of vocabulary words are initialised with random gaussian
@@ -275,7 +265,7 @@ class UbuntuCorpus(Dataset):
             # word2vec
             if os.path.exists(wordict_path):
                 self.Vocab.worddict = self.load(wordict_path)
-            elif type == 'train' and self.Vocab.worddict:
+            elif type == 'train':
                 self.Vocab.build_worddict(*w2v_data)
                 self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
             # build_worddict first
@@ -287,21 +277,22 @@ class UbuntuCorpus(Dataset):
         if type == 'train':
              # if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
             emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.txt'])
-            # bert_emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
-            if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
-            # if not os.path.exists(emb_path):
-            #     self.embeddings = self.Vocab.train_word2vec(w2v_data)
-            #     self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
-            # if not os.path.exists(bert_emb_path):
-            #     self.embeddings = self.Vocab.build_embed_layer(emb_path)
-            #     np.save(bert_emb_path, self.embeddings)
-            # else:
-            #     self.embeddings = np.load(bert_emb_path)
+            bert_emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
+            if not self.Vocab.worddict and os.path.exists(wordict_path): self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
+            elif not os.path.exists(wordict_path): self.Vocab.build_worddict(*self.data[0])
             if not os.path.exists(emb_path):
                 self.embeddings = self.Vocab.train_word2vec(self.data[0])
-                self.embeddings.save(emb_path)
+                self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
+            if not os.path.exists(bert_emb_path):
+                self.embeddings = self.Vocab.build_embed_layer(emb_path)
+                np.save(bert_emb_path, self.embeddings)
             else:
-                self.embeddings = Word2Vec.load(emb_path) # offset = 4
+                self.embeddings = np.load(bert_emb_path)
+            # if not os.path.exists(emb_path):
+            #     self.embeddings = self.Vocab.train_word2vec(self.data[0])
+            #     self.embeddings.save(emb_path)
+            # else:
+            #     self.embeddings = Word2Vec.load(emb_path) # offset = 4
 
 
 
@@ -345,14 +336,14 @@ class UbuntuCorpus(Dataset):
 
 
 def ub_corpus_train_collate_fn(data):
-    if len(data) == 2:
+    if len(data[0]) == 2:
         return (ub_corpus_train_collate_fn(data[0]), ub_corpus_train_collate_fn(data[1]))
     t_c, t_r, label = zip(*data)
     padded_c, padded_r = padding(*zip(*t_c)), padding(*zip(*t_r))
     return padded_c, padded_r, label
 
 def ub_corpus_test_collate_fn(data):
-    if len(data) == 2:
+    if len(data[0]) == 2:
         return (ub_corpus_test_collate_fn(data[0]), ub_corpus_test_collate_fn(data[1]))
     # data : [((c, c_l), (r, r_l), ((neg_1, neg_1_l), ...(neg_n, neg_n_l))) * batch_size]
     t_c, t_r, n_s = zip(*data)
