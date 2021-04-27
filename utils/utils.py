@@ -112,6 +112,7 @@ def masked_max(
     `torch.Tensor`
         A `torch.Tensor` of including the maximum values.
     """
+    if not mask: return torch.max(vector, dim=dim, keepdim=keepdim)[0]
     replaced_vector = vector.masked_fill(~mask, min_value_of_dtype(vector.dtype))
     max_value, _ = replaced_vector.max(dim=dim, keepdim=keepdim)
     return max_value
@@ -135,6 +136,7 @@ def masked_mean(
     `torch.Tensor`
         A `torch.Tensor` of including the mean values.
     """
+    if not mask: return torch.mean(vector, dim=dim, keepdim=keepdim)
     replaced_vector = vector.masked_fill(~mask, 0.0)
 
     value_sum = torch.sum(replaced_vector, dim=dim, keepdim=keepdim)

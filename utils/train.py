@@ -169,10 +169,8 @@ class Trainer:
         log_start_time = 0
         for batch, data in enumerate(self.train_iter):
             w2v_data, b_data, label = data[0], data[1], data[0][2]
-            if len(label) != self.batch_size:
-                continue
-            elif not set(list(label)) == set([0, 1]):
-                continue
+            if len(label) != self.batch_size: continue
+            elif not set(list(label)) == set([0, 1]): continue
             self.optimizer.zero_grad()
             self.train_step += 1
             label = torch.tensor(label, dtype=torch.long)

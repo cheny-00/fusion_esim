@@ -78,10 +78,14 @@ class ESIM_like(nn.Module):
         self.apply(_init_weights)
 
     def forward(self, w2v_data, b_data):
-        inp = tuple(zip(*(w2v_data, b_data))) # c, c_l, r, r_l
+        # inp = tuple(zip(*(w2v_data, b_data))) # c, c_l, r, r_l
         context_len, response_len = None, None
-        w2v_c, w2v_r = self.embedding(inp[0][0].clone().detach()), self.embedding(inp[2][0].clone().detach())
-        bert_c, bert_r = self.bert_embeddings(inp[0][1].clone().detach()), self.bert_embeddings(inp[2][1].clone().detach())
+        w2v_c, w2v_r = tuple(map(lambda x:self.embedding(x[0].clone().detach().cuda()), w2v_data[:2]))
+        # w2v_c, w2v_r = self.embedding(w2v_data[0][0].clone().detach()), self.embedding(b_data[0][0].clone().detach())
+        bert_c, bert_r = tuple(map(lambda x:self.bert_embeddings(x[0].clone().detach().cuda()), b_data[:2]))
+        # bert_c, bert_r = self.bert_embeddings(b_data[1][0].clone().detach()), self.bert_embeddings(b_data[1][0].clone().detach())
+        w2v_c, bert_c = self.__padding(w2v_c, bert_c)
+        w2v_r, bert_r = self.__padding(w2v_r, bert_r)
 
         context_embed, response_embed = self.combine_inp(torch.cat((w2v_c, bert_c), dim=-1)),\
                                         self.combine_inp(torch.cat((w2v_r, bert_r), dim=-1))
@@ -133,10 +137,11 @@ class ESIM_like(nn.Module):
         # r_agg, _ = self.composition(self.com_ln_r(projected_r), response_len)
 
         # aggregated projection (b, s, d)
-        c_mean = masked_mean(c_agg, c_mask.unsqueeze(-1), 1, True).squeeze(-2)
-        r_mean = masked_mean(r_agg, r_mask.unsqueeze(-1), 1, True).squeeze(-2)
-        c_max = masked_max(c_agg, c_mask.unsqueeze(-1), 1, True).squeeze(-2)
-        r_max = masked_max(r_agg, r_mask.unsqueeze(-1), 1, True).squeeze(-2)
+        # c_mask = c_mask.unsqueeze(-1)
+        c_mean = masked_mean(c_agg, c_mask, 1, True).squeeze(-2)
+        r_mean = masked_mean(r_agg, r_mask, 1, True).squeeze(-2)
+        c_max = masked_max(c_agg, c_mask, 1, True).squeeze(-2)
+        r_max = masked_max(r_agg, r_mask, 1, True).squeeze(-2)
 
         aggregated = torch.cat((c_max,
                                 c_mean,
@@ -149,6 +154,14 @@ class ESIM_like(nn.Module):
         logit = self._classifier(aggregated)
         return logit
 
+    @staticmethod
+    def __padding(x_1, x_2):
+        # x_1: w2v_data, x_2 => bert_data
+        if x_1.size(1) < x_2.size(1):
+            x_1 = torch.cat((x_1, torch.zeros(x_1.size(0),
+                                              x_2.size(1)-x_1.size(1),
+                                              x_1.size(2)).cuda()), dim=1)
+        return x_1[:, :x_2.size(1), :], x_2
 
 class Bert(nn.Module):
 
