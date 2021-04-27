@@ -180,7 +180,6 @@ def main(args):
         train_model.fusion_train(epoch,
                                  scheduler=scheduler,
                                  warmup_step=args.warmup_step)
-        exit()
         if (epoch + 1) % args.eval_interval == 0:
             eva, eval_loss = train_model.fusion_evaluate()
 

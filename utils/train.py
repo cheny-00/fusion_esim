@@ -215,18 +215,17 @@ class Trainer:
 
         with torch.no_grad():
 
-            for i, (c, s, neg) in enumerate(self.eval_iter):
-                context, context_len = c[0], c[1]
-
-                if context.size(0) != self.batch_size:
-                    continue
+            for i, data in enumerate(self.eval_iter):
+                w2v_data, b_data, neg = data[0], data[1], data[2]
+                if len(w2v_data[0]) != self.batch_size: continue
                 n_con += 1
-                eva_lg = self.model(context.to(self.device), context_len.cpu(), s[0].to(self.device), s[1].cpu())
-                loss = self.crit(eva_lg, torch.tensor([1] * self.batch_size).to(self.device))
-                prob = nn.functional.softmax(eva_lg, dim=1)[:, 1].unsqueeze(1)
+                eva_lg_e, eva_lg_b = self.model(w2v_data, b_data)
+                loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device))
+                prob = nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1)
                 total_loss += loss.item()
                 for sample in neg:
-                    x_1_eva_f_lg, x_2_eva_f_lg = self.model(context, context_len.cpu(), sample[0], sample[1].cpu())
+                    w2v_data, b_data = (w2v_data[0], sample), (b_data[0], sample)
+                    x_1_eva_f_lg, x_2_eva_f_lg = self.model(w2v_data, b_data)
                     #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
                     loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) + \
                            self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))

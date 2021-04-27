@@ -19,7 +19,7 @@ class ESIM_like(nn.Module):
                  ismasked=True):
         super(ESIM_like, self).__init__()
         # hyper parameters
-        self.input_size = input_size
+        self.input_size = 512
         self.hidden_size = hidden_size
         self.n_layer = n_layer
         self.dropout = dropout
