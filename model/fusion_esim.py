@@ -167,12 +167,11 @@ class Bert(nn.Module):
 
     def __init__(self,
                  BERT,
-                 bert_dim=768,
                  n_bert_token=0,
                  dropout=0.5):
         super(Bert, self).__init__()
-        bert_dim = 768
         self.BERT = BERT
+        bert_dim = BERT.embeddings.word_embeddings.embedding_dim
         self.drop = nn.Dropout(dropout)
         self.n_bert_token = n_bert_token - 1
         self._classifier = nn.Sequential(self.drop,
@@ -213,13 +212,11 @@ class FusionEsim(nn.Module):
 
     def __init__(self,
                  BERT,
-                 bert_dim=768,
                  n_bert_token=0,
                  **kwargs):
         super(FusionEsim, self).__init__()
         self.ESIM = ESIM_like(bert_embeddings=BERT.embeddings.word_embeddings, **kwargs)
         self.Bert = Bert(BERT,
-                         bert_dim,
                          n_bert_token,
                          kwargs['dropout'])
         self.crit = nn.CrossEntropyLoss()
@@ -227,10 +224,8 @@ class FusionEsim(nn.Module):
                 w2v,
                 br):
         esim_logit = self.ESIM(w2v, br)
-        if 1:
-            bert_logit = self.Bert(*br[0], *br[1])
-        else:
-            bert_logit = 0
+
+        bert_logit = self.Bert(*br[0], *br[1])
 
         return esim_logit, bert_logit
 

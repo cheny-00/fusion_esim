@@ -101,7 +101,6 @@ def main(args):
     else:
         if args.model == 'fusion_esim':
             model = fusion_esim.FusionEsim(BERT=bert,
-                                           bert_dim=512,
                                            n_bert_token=train_dataset.Vocab.n_bert_token,
                                            n_token=-1,
                                            input_size=args.d_embed,
