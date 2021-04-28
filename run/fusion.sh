@@ -8,10 +8,10 @@ python3 ../fusion_run.py \
     --dropout 0.5  \
     --dropatt 0.15   \
     --optim adam    \
-    --lr 0.0004    \
+    --lr 0.001    \
     --eta_min 0.00003 \
-    --scheduler dev_perf \
-    --warmup_step 8100 \
+    --scheduler inv_sqrt \
+    --warmup_step 5000 \
     --epochs 64 \
     --cuda              \
     --model_name bert \

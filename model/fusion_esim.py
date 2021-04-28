@@ -198,10 +198,10 @@ class Bert(nn.Module):
         attn_mask = get_mask_from_seq_lens(input_len)
         token_ids = torch.cat((torch.zeros(c.size()[:2]),
                                torch.ones(r.size(0), r.size(1)-1)), dim=1).long().cuda()
-        if input_ids.size(1) > 512:
-            print(input_len, c.size(), r.size())
-            raise AssertionError
-        # input_ids, attn_mask, token_ids =
+       # if input_ids.size(1) > 512:
+       #     print(input_len, c.size(), r.size())
+       #     raise AssertionError
+       # # input_ids, attn_mask, token_ids =
         output = self.BERT(input_ids=input_ids,
                            attention_mask=attn_mask,
                            token_type_ids=token_ids).last_hidden_state

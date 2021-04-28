@@ -188,11 +188,11 @@ class Trainer:
                 loss.backward()
                 nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
             self.optimizer.step()
-            # if 'scheduler' and 'warmup_step' in kwargs:
-            #     scheduler = kwargs['scheduler']
-            #     warmup_step = kwargs['warmup_step']
-            #     if self.train_step < warmup_step:
-            #         scheduler.step()
+            if 'scheduler' and 'warmup_step' in kwargs:
+                scheduler = kwargs['scheduler']
+                warmup_step = kwargs['warmup_step']
+                if self.train_step < warmup_step:
+                    scheduler.step()
             self.train_loss += loss.float().item()
 
             if self.train_step % self.log_interval == 0:
