@@ -226,7 +226,7 @@ class FusionEsim(nn.Module):
                 w2v,
                 br):
         esim_logit = self.ESIM(w2v, br)
-        if 0:
+        if 1:
             bert_logit = self.Bert(*br)
         else:
             bert_logit = 0
