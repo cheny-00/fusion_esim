@@ -344,8 +344,14 @@ def ub_corpus_train_collate_fn(data):
     return padded_c, padded_r, label
 
 def ub_corpus_test_collate_fn(data):
+    print("o", len(data))
+    print("[0]", len(data[0]))
+    print("[0][0]", len(data[0][0]))
     if len(data[0]) == 2:
         data = tuple(zip(*data))
+        print("z", len(data))
+        print("[z]", len(data[0]))
+        print("[z][z]", len(data[0][0]))
         return (ub_corpus_test_collate_fn(data[0]), ub_corpus_test_collate_fn(data[1]))
     # data : [((c, c_l), (r, r_l), ((neg_1, neg_1_l), ...(neg_n, neg_n_l))) * batch_size]
     t_c, t_r, n_s = zip(*data)
@@ -379,15 +385,22 @@ if __name__ == '__main__':
     save_path = '/remote_workspace/fusion_esim/data/examples'
     model_name = 'bert'
     bert_path = '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8'
-    # val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'])
-    train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
-    # val_dataloader = DataLoader(val_dataset, batch_size=3, collate_fn=ub_corpus_test_collate_fn)
-    train_dataloader = DataLoader(train_dataset, batch_size=16, collate_fn=ub_corpus_train_collate_fn)
+    val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    # train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    val_dataloader = DataLoader(val_dataset, batch_size=5, collate_fn=ub_corpus_test_collate_fn)
+    # train_dataloader = DataLoader(train_dataset, batch_size=16, collate_fn=ub_corpus_train_collate_fn)
     # while 1:
-    #
-    #     for i, (c, s, n) in enumerate(val_dataloader):
-        # for i, d in enumerate(train_dataloader):
-        #     print(d)
-        #     exit()
+    # #
+    #     # for i, (c, s, n) in enumerate(val_dataloader):
+    #     for i, d in enumerate(val_dataloader):
+    #         print(len(d))
+    #         print(len(d[0]))
+    #         print(len(d[0][2]))
+    #         w, b = d[0][2], d[1][2]
+    #         for wn, bn in zip(w, b):
+    #             print(len(wn[0]), len(wn[1]))
+    #             print(len(bn[0]), len(bn[1]))
+    #         # print(d)
+    #         exit()
     
         # print("end epoch")
