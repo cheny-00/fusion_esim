@@ -177,9 +177,9 @@ def main(args):
     best_score = 0
 
     for epoch in range(args.epochs):
-        train_model.fusion_train(epoch,
-                                 scheduler=scheduler,
-                                 warmup_step=args.warmup_step)
+        # train_model.fusion_train(epoch,
+        #                          scheduler=scheduler,
+        #                          warmup_step=args.warmup_step)
         if (epoch + 1) % args.eval_interval == 0:
             eva, eval_loss = train_model.fusion_evaluate()
 

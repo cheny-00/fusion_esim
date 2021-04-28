@@ -218,7 +218,7 @@ class Trainer:
             for i, data in enumerate(self.eval_iter):
                 w2v_data, b_data = data[0], data[1]
                 w_neg, b_neg = w2v_data[2], b_data[2]
-                if len(w2v_data[0]) != self.batch_size: continue
+                if len(w2v_data[0][0]) != self.batch_size: continue
                 n_con += 1
                 eva_lg_e, eva_lg_b = self.model(w2v_data, b_data)
                 loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device))
@@ -228,13 +228,10 @@ class Trainer:
                     w2v_data, b_data = (w2v_data[0], w_sample), (b_data[0], b_sample)
                     x_1_eva_f_lg, x_2_eva_f_lg = self.model(w2v_data, b_data)
                     #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
-                    loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) + \
-                           self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
+                    loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) # + \
+                           # self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
                     total_loss += loss.item()
-                    prob = torch.cat((prob, nn.functional.softmax(
-                        nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1) + \
-                        nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1), dim=1)),
-                                     dim=1)
+                    prob = torch.cat((prob, nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
                 prob_set.append(prob.tolist())
             eva = eval_samples(prob_set)
         self.logging('-' * 100)

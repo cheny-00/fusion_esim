@@ -344,14 +344,8 @@ def ub_corpus_train_collate_fn(data):
     return padded_c, padded_r, label
 
 def ub_corpus_test_collate_fn(data):
-    print("o", len(data))
-    print("[0]", len(data[0]))
-    print("[0][0]", len(data[0][0]))
     if len(data[0]) == 2:
         data = tuple(zip(*data))
-        print("z", len(data))
-        print("[z]", len(data[0]))
-        print("[z][z]", len(data[0][0]))
         return (ub_corpus_test_collate_fn(data[0]), ub_corpus_test_collate_fn(data[1]))
     # data : [((c, c_l), (r, r_l), ((neg_1, neg_1_l), ...(neg_n, neg_n_l))) * batch_size]
     t_c, t_r, n_s = zip(*data)
