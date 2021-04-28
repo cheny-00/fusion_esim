@@ -177,8 +177,8 @@ class Trainer:
 
             x_1_logit, x_2_logit = self.model(w2v_data,
                                               b_data)
-            loss = self.crit(x_1_logit, label.to(device))  #+ \
-                #    self.crit(x_2_logit, label.to(device))
+            loss = (self.crit(x_1_logit, label.to(device)) +
+                    self.crit(x_2_logit, label.to(device))) / 2
 
             if self.fp16:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
@@ -221,15 +221,17 @@ class Trainer:
                 if len(w2v_data[0]) != self.batch_size: continue
                 n_con += 1
                 eva_lg_e, eva_lg_b = self.model(w2v_data, b_data)
-                loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device))
-                prob = nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1)
+                loss = (self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device)) +
+                        self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))) / 2
+                prob = nn.functional.softmax(nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1) +
+                                             nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1), dim=1)
                 total_loss += loss.item()
                 for w_sample, b_sample in zip(w_neg, b_neg):
                     w2v_data, b_data = (w2v_data[0], w_sample), (b_data[0], b_sample)
                     x_1_eva_f_lg, x_2_eva_f_lg = self.model(w2v_data, b_data)
                     #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
-                    loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) + \
-                           self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
+                    loss = (self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) +
+                            self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))) / 2
                     total_loss += loss.item()
                     prob = torch.cat((prob, nn.functional.softmax(
                         nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1) + \
