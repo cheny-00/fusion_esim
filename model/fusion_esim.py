@@ -19,7 +19,7 @@ class ESIM_like(nn.Module):
                  ismasked=True):
         super(ESIM_like, self).__init__()
         # hyper parameters
-        self.input_size = 512
+        self.input_size = 768
         self.hidden_size = hidden_size
         self.n_layer = n_layer
         self.dropout = dropout
@@ -171,6 +171,7 @@ class Bert(nn.Module):
                  n_bert_token=0,
                  dropout=0.5):
         super(Bert, self).__init__()
+        bert_dim = 768
         self.BERT = BERT
         self.drop = nn.Dropout(dropout)
         self.n_bert_token = n_bert_token - 1
@@ -182,7 +183,7 @@ class Bert(nn.Module):
 
     def forward(self, c, c_len, r, r_len):
         SEP, UNK = 102, 100
-        c, r = c.clone().detach(), r.clone().detach()
+        c, r = c.clone().detach().cuda(), r.clone().detach().cuda()
         c_len, r_len = c_len.cuda(), r_len.cuda()
         # c, r = c.masked_fill(c > self.n_bert_token, torch.tensor(UNK)), \
         #        r.masked_fill(r > self.n_bert_token, torch.tensor(UNK))
@@ -212,7 +213,7 @@ class FusionEsim(nn.Module):
 
     def __init__(self,
                  BERT,
-                 bert_dim=512,
+                 bert_dim=768,
                  n_bert_token=0,
                  **kwargs):
         super(FusionEsim, self).__init__()
@@ -227,7 +228,7 @@ class FusionEsim(nn.Module):
                 br):
         esim_logit = self.ESIM(w2v, br)
         if 1:
-            bert_logit = self.Bert(*br)
+            bert_logit = self.Bert(*br[0], *br[1])
         else:
             bert_logit = 0
 
