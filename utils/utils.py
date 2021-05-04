@@ -3,13 +3,14 @@ import torch.nn
 
 
 # modify by https://github.com/allenai/allennlp/blob/master/allennlp/nn/util.py
-def get_mask_from_seq_lens(seq_lens): # TODO => 4 dim
+def get_mask_from_seq_lens(seq_lens, upper_limit=float('inf')): # TODO => 4 dim
     """
 
     :param seq_lens: batch of seq_lens, shape (b, s)
     :return: bool
     """
-    mask_ons = seq_lens.new_ones(seq_lens.size(0), torch.max(seq_lens))
+    seq_max_len = torch.max(seq_lens)
+    mask_ons = seq_lens.new_ones(seq_lens.size(0), seq_max_len if seq_max_len < upper_limit else upper_limit)
     return seq_lens.unsqueeze(1) >= mask_ons.cumsum(dim=1)
 
 

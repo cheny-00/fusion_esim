@@ -195,7 +195,7 @@ class Bert(nn.Module):
         c = c[:, :d]
         input_ids = torch.cat((c, r[:, 1:]), dim=1)
         input_len = c.size(1) + r_len - 1
-        attn_mask = get_mask_from_seq_lens(input_len)
+        attn_mask = get_mask_from_seq_lens(input_len, 511)
         token_ids = torch.cat((torch.zeros(c.size()[:2]),
                                torch.ones(r.size(0), r.size(1)-1)), dim=1).long().cuda()
        # if input_ids.size(1) > 512:
@@ -203,7 +203,7 @@ class Bert(nn.Module):
        #     raise AssertionError
        # # input_ids, attn_mask, token_ids =
         print(input_ids.size(), attn_mask.size(), token_ids.size())
-        exit()
+        print(attn_mask)
         output = self.BERT(input_ids=input_ids,
                            attention_mask=attn_mask,
                            token_type_ids=token_ids).last_hidden_state
