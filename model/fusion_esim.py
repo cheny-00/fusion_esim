@@ -190,8 +190,8 @@ class Bert(nn.Module):
         convert_pad = torch.ones_like(c) * SEP * torch.logical_not(c_mask)
         c += convert_pad
         # if c.size(1) + r.size(1) - 1 > 512:
-        r = r[:, :256]
-        d = 512 - r.size(1) + 1
+        r = r[:, :257]
+        d = 512 - r.size(1)
         c = c[:, :d]
         input_ids = torch.cat((c, r[:, 1:]), dim=1)
         input_len = c.size(1) + r_len - 1
