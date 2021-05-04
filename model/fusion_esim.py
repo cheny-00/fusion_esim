@@ -193,7 +193,7 @@ class Bert(nn.Module):
             r = r[:, :257]
             d = 512 - r.size(1)
             c = c[:, :d]
-            r_len.clamp_(max=256)
+            r_len.clamp_(max=257)
         input_ids = torch.cat((c, r[:, 1:]), dim=1)
         input_len = c.size(1) + r_len - 1
         attn_mask = get_mask_from_seq_lens(input_len, 511)
