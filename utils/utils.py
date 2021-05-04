@@ -3,7 +3,7 @@ import torch.nn
 
 
 # modify by https://github.com/allenai/allennlp/blob/master/allennlp/nn/util.py
-def get_mask_from_seq_lens(seq_lens, upper_limit=float('inf')): # TODO => 4 dim
+def get_mask_from_seq_lens(seq_lens, upper_limit=torch.tensor(float('inf'))): # TODO => 4 dim
     """
 
     :param seq_lens: batch of seq_lens, shape (b, s)

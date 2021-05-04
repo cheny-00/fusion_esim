@@ -202,8 +202,6 @@ class Bert(nn.Module):
        #     print(input_len, c.size(), r.size())
        #     raise AssertionError
        # # input_ids, attn_mask, token_ids =
-        print(input_ids.size(), attn_mask.size(), token_ids.size())
-        print(attn_mask)
         output = self.BERT(input_ids=input_ids,
                            attention_mask=attn_mask,
                            token_type_ids=token_ids).last_hidden_state
