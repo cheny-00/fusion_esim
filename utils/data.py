@@ -54,7 +54,6 @@ class Vocab(object):
                                                            do_lower_case=lower_case)
             self.n_bert_token = self.tokenizer.vocab_size
 
-        self.w2v_tokenizer = spacy.load("en_core_web_sm")
 
     def pre_tokenize(self, line):
         for token in self.special:
@@ -66,16 +65,11 @@ class Vocab(object):
         # TODO add_special_tokens & truncation
         return encoded_line
 
-    def w2v_tokenize(self, line):
-        text = [tok.text for tok in self.w2v_tokenizer.tokenizer(self.pre_tokenize(line)) if tok.text != '']
-        return text
 
     def read_csv_file(self, path, train, func=None, w2v_f = None):
         assert os.path.exists(path)
         if not func:
             func = self.tokenize
-        if not w2v_f:
-            w2v_f = self.w2v_tokenize
         type = 'train' if train else 'valid or test'
         task = self.progress.add_task(type, dataset="UbuntuCorpus/{}".format(type), start=False)
         f = pd.read_csv(path)
@@ -90,8 +84,7 @@ class Vocab(object):
             neg_data = [f[neg].tolist() for neg in neg_samples]
             data = (context, response, neg_data)
         b_data = self.iter_data(data, task, train, func)
-        w2v_data = self.iter_data(data, task, train, w2v_f)
-        return (w2v_data, b_data)
+        return b_data
 
 
     def get_word(self, c, r, l):
@@ -107,37 +100,10 @@ class Vocab(object):
         counts = Counter(words)
         num_words = len(counts)
         self.offset = 0
-
-        self.worddict["[PAD]"] = 0
-        self.worddict["[UNK]"] = 1
-        #
-        # for t in self.special:
-        #     self.worddict[t] = offset
-        #     offset += 1
-        n_tokens = len(self.worddict)
         for i, word in enumerate(counts.most_common(num_words)):
-            if word[0] not in self.worddict:
-                self.worddict[word[0]] = n_tokens
-                n_tokens += 1
+            if word[0] not in self.worddict and 5 <= word[1]:
+                self.worddict[word[0]] = word[1]
 
-    def words_to_indices(self, text):
-        """
-        transform sentence to indices
-        :param text: sentence
-        :return: list of indices
-        """
-        indices = []
-        for word in text:
-            if word in self.worddict:
-                index = self.worddict[word]
-            else:
-                index = self.worddict["[UNK]"]
-            indices.append(index)
-        return indices
-
-    def file_to_indices(self, data, train):
-        task = self.progress.add_task("test", dataset="word2indices", start=False)
-        return self.iter_data(data, task, train, self.words_to_indices)
 
     def iter_data(self, data, task, train, func):
         c, r = data[0], data[1]
@@ -159,90 +125,12 @@ class Vocab(object):
                 self.progress.update(task, advance=1)
         return c_res, r_res, l if train else n_res
 
-    def train_word2vec(self, data):
-        data_indices_str = []
-        for d in data[:2]:
-            for x in d:
-                data_indices_str.append(list(map(str, x)))
-        w2v_model = Word2Vec(data_indices_str, size=300, window=5, min_count=5,
-                             sg=1, workers=multiprocessing.cpu_count())
-        return w2v_model
+    def build_embed_layer(self, embedding_weight):
+        res_embed = torch.randn_like(embedding_weight)
+        for word, times in self.worddict.items():
+            res_embed[word] = embedding_weight[word]
+        return res_embed
 
-    def build_embed_layer(self, embeddings_file):
-        embed_dict = {}
-        with open(embeddings_file, "r", encoding="utf8") as f:
-            for idx, line in enumerate(f):
-                if idx == 0: continue
-                line = line.split()
-                try:
-                    float(line[1])
-                    word = line[0]
-                    if word in self.worddict:
-                        embed_dict[word] = line[1:]
-                except ValueError:
-                    continue
-            n_token = len(self.worddict)
-            embed_dim = len(list(embed_dict.values())[0])
-            embed_matrix = np.zeros((n_token, embed_dim))
-            for word, i in self.worddict.items():
-                if str(i) in embed_dict:
-                    embed_matrix[i] = np.array(embed_dict[str(i)], dtype=float)
-                else:
-                    if word == "[PAD]": continue
-                    embed_matrix[i] = np.random.normal(size=(embed_dim))
-        return embed_matrix
-    # https://github.com/coetaur0/ESIM/blob/65611601ff9f17f76e1f246e8e46b5fc4bee13fc/esim/data.py
-    def build_embedding_matrix(self, embeddings_file):
-        """
-        Build an embedding matrix with pretrained weights for object's
-        worddict.
-        Args:
-            embeddings_file: A file containing pretrained word embeddings.
-        Returns:
-            A numpy matrix of size (num_words+n_special_tokens, embedding_dim)
-            containing pretrained word embeddings (the +n_special_tokens is for
-            the padding and out-of-vocabulary tokens, as well as BOS and EOS if
-            they're used).
-        """
-        # Load the word embeddings in a dictionnary.
-        embeddings = {}
-        with open(embeddings_file, "r", encoding="utf8") as input_data:
-            for line in input_data:
-                line = line.split()
-
-                try:
-                    # Check that the second element on the line is the start
-                    # of the embedding and not another word. Necessary to
-                    # ignore multiple word lines.
-                    float(line[1])
-                    word = line[0]
-                    if word in self.worddict:
-                        embeddings[word] = line[1:]
-
-                # Ignore lines corresponding to multiple words separated
-                # by spaces.
-                except ValueError:
-                    continue
-
-        num_words = len(self.worddict)
-        embedding_dim = len(list(embeddings.values())[0])
-        embedding_matrix = np.zeros((num_words, embedding_dim))
-
-        # Actual building of the embedding matrix.
-        missed = 0
-        for word, i in self.worddict.items():
-            if word in embeddings:
-                embedding_matrix[i] = np.array(embeddings[word], dtype=float)
-            else:
-                if word == "[PAD]":
-                    continue
-                missed += 1
-                # Out of vocabulary words are initialised with random gaussian
-                # samples.
-                embedding_matrix[i] = np.random.normal(size=(embedding_dim))
-        print("Missed words: ", missed)
-
-        return embedding_matrix
 
 
 
@@ -261,27 +149,24 @@ class UbuntuCorpus(Dataset):
         wordict_path = os.path.join(save_path, 'worddict')
 
         if not self.data:
-            w2v_data, b_data = self.Vocab.read_csv_file(path=path, train=(type=='train')) # (w2v, bert)
+            self.data = self.Vocab.read_csv_file(path=path, train=(type=='train')) # (w2v, bert)
             # word2vec
             if os.path.exists(wordict_path):
                 self.Vocab.worddict = self.load(wordict_path)
             elif type == 'train':
-                self.Vocab.build_worddict(*w2v_data)
+                self.Vocab.build_worddict(*self.data)
                 self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
             # build_worddict first
             assert self.Vocab.worddict, 'make suere worddict exist'
-            w2v_data = self.Vocab.file_to_indices(data=w2v_data,
-                                                  train=type=='train')
-            self.data = (w2v_data, b_data)
             self.dump(self.data, s_path)
         if type == 'train':
-             # if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
+            # if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
             emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.txt'])
             bert_emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
             if not self.Vocab.worddict and os.path.exists(wordict_path): self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
             elif not os.path.exists(wordict_path): self.Vocab.build_worddict(*self.data[0])
             if not os.path.exists(emb_path):
-                self.embeddings = self.Vocab.train_word2vec(self.data[0])
+                self.embeddings = self.
                 self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
             if not os.path.exists(bert_emb_path):
                 self.embeddings = self.Vocab.build_embed_layer(emb_path)

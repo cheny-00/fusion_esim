@@ -73,10 +73,7 @@ def main(args):
                            drop_last=True,
                            shuffle=False)
 
-    ## build word embedding
-    _word_embedding = train_dataset.embeddings
-    _word_embedding = torch.FloatTensor(_word_embedding)
-    embedding_layer = nn.Embedding.from_pretrained(_word_embedding, freeze=False)
+
 
     ## Build Bert model
     if 'bert' in model_name:
@@ -90,6 +87,10 @@ def main(args):
     bert = ModelClass.from_pretrained(args.bert_path, state_dict=pre_trianed_state)
     del pre_trianed_state
 
+    ## build word embedding
+    _word_embedding = bert.embeddings.word_embeddings
+    _word_embedding = train_dataset.Vocab.build_embed_layer(embedding_weight=_word_embedding.weight)
+    embedding_layer = nn.Embedding.from_pretrained(_word_embedding, freeze=False, padding_idx=0)
     ###############################################################################
     # Build the model
     ###############################################################################
@@ -217,17 +218,15 @@ if __name__ == "__main__":
 
     parser.add_argument("--dataset_path", type=str, default="/remote_workspace/dataset/default/",
                         help='path to dataset')
-    parser.add_argument("--vocab_path", type=str, default="/remote_workspace/rs_trans/data/vocab",
-                        help='path to dump vocabs')
-    parser.add_argument("--examples_path", type=str, default="/remote_workspace/rs_trans/data/examples",
+    parser.add_argument("--examples_path", type=str, default="/remote_workspace/rs_trans/data/bert",
                         help='path to dump examples')
     parser.add_argument("--save_dir", type=str, default="../checkpoints",
                         help='checkpoints save dir')
     parser.add_argument("--bert_path", type=str, default="../data/pre_trained_ckpt/uncased_L-8_H-512_A-8",
                         help='load pretrained bert ckpt files')
-    parser.add_argument('--batch_size', type=int, default=60,
+    parser.add_argument('--batch_size', type=int, default=16,
                         help='batch size')
-    parser.add_argument('--epochs', type=int, default=100,
+    parser.add_argument('--epochs', type=int, default=64,
                         help='total epochs')
 
     parser.add_argument('--embed_type', type=int, default=1,
