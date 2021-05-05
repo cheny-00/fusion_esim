@@ -159,25 +159,6 @@ class UbuntuCorpus(Dataset):
             # build_worddict first
             assert self.Vocab.worddict, 'make suere worddict exist'
             self.dump(self.data, s_path)
-        if type == 'train':
-            # if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
-            emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.txt'])
-            bert_emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
-            if not self.Vocab.worddict and os.path.exists(wordict_path): self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
-            elif not os.path.exists(wordict_path): self.Vocab.build_worddict(*self.data[0])
-            if not os.path.exists(emb_path):
-                self.embeddings = self.
-                self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
-            if not os.path.exists(bert_emb_path):
-                self.embeddings = self.Vocab.build_embed_layer(emb_path)
-                np.save(bert_emb_path, self.embeddings)
-            else:
-                self.embeddings = np.load(bert_emb_path)
-            # if not os.path.exists(emb_path):
-            #     self.embeddings = self.Vocab.train_word2vec(self.data[0])
-            #     self.embeddings.save(emb_path)
-            # else:
-            #     self.embeddings = Word2Vec.load(emb_path) # offset = 4
 
 
 
