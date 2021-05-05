@@ -61,15 +61,14 @@ class Trainer:
         device = self.device
         log_start_time = 0
         for batch, data in enumerate(self.train_iter):
-            w2v_data, b_data, label = data[0], data[1], data[0][2]
+            label = data[2]
             if len(label) != self.batch_size: continue
             elif not set(list(label)) == set([0, 1]): continue
             self.optimizer.zero_grad()
             self.train_step += 1
             label = torch.tensor(label, dtype=torch.long)
 
-            x_1_logit, x_2_logit = self.model(w2v_data,
-                                              b_data)
+            x_1_logit, x_2_logit = self.model(data)
             loss = (self.crit(x_1_logit, label.to(device)) +
                     self.crit(x_2_logit, label.to(device))) / 2
 
@@ -109,19 +108,18 @@ class Trainer:
         with torch.no_grad():
 
             for i, data in enumerate(self.eval_iter):
-                w2v_data, b_data = data[0], data[1]
-                w_neg, b_neg = w2v_data[2], b_data[2]
-                if len(w2v_data[0]) != self.batch_size: continue
+                b_neg = data[2]
+                if len(data[0]) != self.batch_size: continue
                 n_con += 1
-                eva_lg_e, eva_lg_b = self.model(w2v_data, b_data)
+                eva_lg_e, eva_lg_b = self.model(data)
                 loss = (self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device)) +
                         self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))) / 2
                 prob = nn.functional.softmax(nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1) +
                                              nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1), dim=1)
                 total_loss += loss.item()
-                for w_sample, b_sample in zip(w_neg, b_neg):
-                    w2v_data, b_data = (w2v_data[0], w_sample), (b_data[0], b_sample)
-                    x_1_eva_f_lg, x_2_eva_f_lg = self.model(w2v_data, b_data)
+                for b_sample in b_neg:
+                    data = (data[0], b_sample)
+                    x_1_eva_f_lg, x_2_eva_f_lg = self.model(data)
                     #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
                     loss = (self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) +
                             self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))) / 2
