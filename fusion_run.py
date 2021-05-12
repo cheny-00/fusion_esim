@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from utils.train import Trainer
+from utils.train import LSTMTrainer, FineTuningTrainer
 from model import *
 from utils.exp_utils import create_exp_dir, save_checkpoint
 from utils.visdom_plot import VisdomLinePlotter
@@ -162,18 +162,21 @@ def main(args):
     save_dir = os.path.join(args.save_dir, time.strftime('%Y%m%d-%H%M%S'))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    crit = nn.CrossEntropyLoss()
-    train_model = Trainer(model=model,
-                          train_iter=train_iter,
-                          eval_iter=eval_iter,
-                          optimizer=optimizer,
-                          crit=crit,
-                          batch_size=args.batch_size,
-                          fp16=args.fp16,
-                          logging=logging,
-                          log_interval=args.log_interval,
-                          plotter=plotter,
-                          model_name=model_name)
+    crit = args.crit
+    if args.fine_tuning: TrainerClass = FineTuningTrainer
+    else: TrainerClass = LSTMTrainer
+    train_model = TrainerClass(model=model,
+                               train_iter=train_iter,
+                               eval_iter=eval_iter,
+                               optimizer=optimizer,
+                               crit=crit,
+                               batch_size=args.batch_size,
+                               fp16=args.fp16,
+                               logging=logging,
+                               log_interval=args.log_interval,
+                               plotter=plotter,
+                               model_name=model_name)
+
     best_score = 0
 
     for epoch in range(args.epochs):
@@ -198,7 +201,7 @@ def main(args):
                     os.path.join(save_dir, "best.pth.tar"))
             if args.scheduler == 'dev_perf':
                 scheduler.step(eva[1])
-        if not (epoch + 1) % 10:
+        if not (epoch + 1) % 10 or args.fine_tuning:
             save_checkpoint(model,
                             optimizer,
                             save_dir,
@@ -252,10 +255,14 @@ if __name__ == "__main__":
     parser.add_argument('--pre_ln', action='store_true',
                         help='use pre-layernorm')
 
-
+    parser.add_argument('--fine_tuning', action='store_true',
+                        help='fine-tuning step')
     parser.add_argument('--optim', default='adam', type=str,
                         choices=['adam', 'sgd', 'adagrad'],
                         help='optimizer to use.')
+    parser.add_argument('--crit', default='cross_entropy', type=str,
+                        choices=['cross_entropy', 'mse', 'distillation'],
+                        help='loss function to use.')
     parser.add_argument('--lr', type=float, default=0.00025,
                         help='initial learning rate (0.00025|5 for adam|sgd)')
     parser.add_argument('--mom', type=float, default=0.0,

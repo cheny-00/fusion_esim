@@ -214,9 +214,10 @@ class FusionEsim(nn.Module):
                          kwargs['dropout'])
         self.crit = nn.CrossEntropyLoss()
     def forward(self,
-                br):
-        esim_logit = self.ESIM(br)
-
+                br,
+                fine_tuning=False):
+        if not fine_tuning:
+            esim_logit = self.ESIM(br)
         bert_logit = self.Bert(*br[0], *br[1])
 
         return esim_logit, bert_logit

@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from eval.evaluation import eval_samples
 from utils import get_mask_from_seq_lens
-class Trainer:
+class Trainer():
 
     def __init__(self,
                  model,
@@ -25,8 +25,8 @@ class Trainer:
         self.train_iter = train_iter
         self.eval_iter = eval_iter
         self.optimizer = optimizer
-        self.crit = crit
         self.batch_size = batch_size
+        self.crit = crit
         self.fp16 = fp16
         self.logging = logging
         self.log_interval = log_interval
@@ -34,14 +34,13 @@ class Trainer:
         self.train_step = 0
         self.train_loss = 0
         self.model_name = model_name
-
-        # if 'bert' in self.model_name:
-        #     # TODO BertConfig Class
-        #     self._proj = nn.Sequential(
-        #         nn.Linear(768, 300),
-        #         nn.ReLU()
-        #     )
-        #     self._proj.to(self.device)
+        if self.crit == "cross_entropy":
+            self.crit = nn.CrossEntropyLoss()
+        elif self.crit == "mse":
+            self.crit == nn.MSELoss()
+        elif self.crit == "distillation":
+            self.crit = nn.CrossEntropyLoss()
+            self.logit_crit = nn.MSELoss()
 
         if self.fp16:
             if not 'cuda' in self.device.type:
@@ -54,6 +53,10 @@ class Trainer:
                     print('WARNING: apex not installed, ignoring --fp16 option')
                     self.fp16 = False
 
+    def train_step(self, *args):
+        return NotImplementedError()
+    def eval_step(self, *args):
+        return NotImplementedError()
     def fusion_train(self,
                      epoch_num,
                      **kwargs):
@@ -61,17 +64,8 @@ class Trainer:
         device = self.device
         log_start_time = 0
         for batch, data in enumerate(self.train_iter):
-            label = data[2]
-            if len(label) != self.batch_size: continue
-            elif not set(list(label)) == set([0, 1]): continue
-            self.optimizer.zero_grad()
-            self.train_step += 1
-            label = torch.tensor(label, dtype=torch.long)
-
-            x_1_logit, x_2_logit = self.model(data)
-            loss = (self.crit(x_1_logit, label.to(device)) +
-                    self.crit(x_2_logit, label.to(device))) / 2
-
+            loss = self.train_step(data)
+            if loss == "continue": continue
             if self.fp16:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                     scaled_loss.backward()
@@ -108,26 +102,7 @@ class Trainer:
         with torch.no_grad():
 
             for i, data in enumerate(self.eval_iter):
-                b_neg = data[2]
-                if len(data[0]) != self.batch_size: continue
-                n_con += 1
-                eva_lg_e, eva_lg_b = self.model(data)
-                loss = (self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device)) +
-                        self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))) / 2
-                prob = nn.functional.softmax(nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1) +
-                                             nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1), dim=1)
-                total_loss += loss.item()
-                for b_sample in b_neg:
-                    data = (data[0], b_sample)
-                    x_1_eva_f_lg, x_2_eva_f_lg = self.model(data)
-                    #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
-                    loss = (self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) +
-                            self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))) / 2
-                    total_loss += loss.item()
-                    prob = torch.cat((prob, nn.functional.softmax(
-                        nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1) + \
-                        nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1), dim=1)),
-                                     dim=1)
+                prob, n_con, total_loss = self.eval_step(data, n_con, total_loss)
                 prob_set.append(prob.tolist())
             eva = eval_samples(prob_set)
         self.logging('-' * 100)
@@ -141,6 +116,76 @@ class Trainer:
         self.logging('-' * 100)
         self.model.train()
         return eva, (total_loss / (n_con * 10))
+    @property
     def get_train_loss(self):
         return self.train_loss
 
+class LSTMTrainer(Trainer):
+
+    def train_step(self, data):
+
+        label = data[2]
+        if len(label) != self.batch_size: return "continue"
+        elif not set(list(label)) == set([0, 1]): return "continue"
+        self.optimizer.zero_grad()
+        self.train_step += 1
+        label = torch.tensor(label, dtype=torch.long)
+
+        x_1_logit, x_2_logit = self.model(data)
+        loss = (self.crit(x_1_logit, label.to(self.device)) +
+                self.crit(x_2_logit, label.to(self.device))) / 2
+        return loss
+
+    def eval_step(self, data, n_con, total_loss):
+        b_neg = data[2]
+        if len(data[0]) != self.batch_size: return "continue"
+        n_con += 1
+        eva_lg_e, eva_lg_b = self.model(data)
+        loss = (self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device)) +
+                self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))) / 2
+        prob = nn.functional.softmax(nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1) +
+                                     nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1), dim=1)
+        total_loss += loss.item()
+        for b_sample in b_neg:
+            data = (data[0], b_sample)
+            x_1_eva_f_lg, x_2_eva_f_lg = self.model(data)
+            #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
+            loss = (self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) +
+                    self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))) / 2
+            total_loss += loss.item()
+            prob = torch.cat((prob, nn.functional.softmax(
+                nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1) + \
+                nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1), dim=1)),
+                             dim=1)
+        return prob, n_con, total_loss
+
+class FineTuningTrainer(Trainer):
+
+    def train_step(self, data):
+
+        label = data[2]
+        if len(label) != self.batch_size: return "continue"
+        elif not set(list(label)) == set([0, 1]): return "continue"
+        self.optimizer.zero_grad()
+        self.train_step += 1
+        label = torch.tensor(label, dtype=torch.long)
+        x_1_logit, x_2_logit = self.model(data)
+        loss = self.crit(x_2_logit, label.to(self.device))
+        return loss
+
+    def eval_step(self, data, n_con, total_loss):
+        b_neg = data[2]
+        if len(data[0]) != self.batch_size: return "continue"
+        n_con += 1
+        eva_lg_e, eva_lg_b = self.model(data)
+        loss = self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))
+        prob = nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1)
+        total_loss += loss.item()
+        for b_sample in b_neg:
+            data = (data[0], b_sample)
+            x_1_eva_f_lg, x_2_eva_f_lg = self.model(data)
+            #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
+            loss = self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
+            total_loss += loss.item()
+            prob = nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1)
+        return prob, n_con, total_loss
