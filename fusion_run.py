@@ -28,7 +28,9 @@ def main(args):
     work_dir = os.path.join(work_dir, 'ubuntu_corpus')
     work_dir = os.path.join(work_dir, time.strftime('%Y%m%d-%H%M%S'))
     logging = create_exp_dir(work_dir,
-        scripts_to_save=['../fusion_run.py', '../model/{}.py'.format(args.model.lower())], debug=args.debug)
+                             scripts_to_save=['../fusion_run.py', '../utils/train.py'
+                                 , '../model/{}.py'.format(args.model.lower())],
+                             debug=args.debug)
 
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
@@ -183,7 +185,7 @@ def main(args):
         train_model.fusion_train(epoch,
                                  scheduler=scheduler,
                                  warmup_step=args.warmup_step)
-        if (epoch + 1) % args.eval_interval == 0 or epoch + 1 == args.epochs:
+        if (epoch + 1) % args.eval_interval == 0 or epoch + 1 == args.epochs or args.fine_tuning:
             eva, eval_loss = train_model.fusion_evaluate()
 
             # save best
