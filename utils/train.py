@@ -53,19 +53,18 @@ class Trainer():
                     print('WARNING: apex not installed, ignoring --fp16 option')
                     self.fp16 = False
 
-    def train_step(self, *args):
+    def train_process(self, *args):
         return NotImplementedError()
-    def eval_step(self, *args):
+    def eval_process(self, *args):
         return NotImplementedError()
     def fusion_train(self,
                      epoch_num,
                      **kwargs):
         self.model.train()
-        device = self.device
         log_start_time = 0
         for batch, data in enumerate(self.train_iter):
-            loss = self.train_step(data)
-            if loss == "continue": continue
+            loss = self.train_process(data)
+            if type(loss) is str: continue
             if self.fp16:
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                     scaled_loss.backward()
@@ -102,7 +101,8 @@ class Trainer():
         with torch.no_grad():
 
             for i, data in enumerate(self.eval_iter):
-                prob, n_con, total_loss = self.eval_step(data, n_con, total_loss)
+                prob, n_con, total_loss = self.eval_process(data, n_con, total_loss)
+                if type(prob) is str: continue
                 prob_set.append(prob.tolist())
             eva = eval_samples(prob_set)
         self.logging('-' * 100)
@@ -122,7 +122,7 @@ class Trainer():
 
 class LSTMTrainer(Trainer):
 
-    def train_step(self, data):
+    def train_process(self, data):
 
         label = data[2]
         if len(label) != self.batch_size: return "continue"
@@ -136,9 +136,9 @@ class LSTMTrainer(Trainer):
                 self.crit(x_2_logit, label.to(self.device))) / 2
         return loss
 
-    def eval_step(self, data, n_con, total_loss):
+    def eval_process(self, data, n_con, total_loss):
         b_neg = data[2]
-        if len(data[0]) != self.batch_size: return "continue"
+        if len(data[0][0]) != self.batch_size: return "continue"
         n_con += 1
         eva_lg_e, eva_lg_b = self.model(data)
         loss = (self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device)) +
@@ -161,29 +161,28 @@ class LSTMTrainer(Trainer):
 
 class FineTuningTrainer(Trainer):
 
-    def train_step(self, data):
-
+    def train_process(self, data):
         label = data[2]
         if len(label) != self.batch_size: return "continue"
         elif not set(list(label)) == set([0, 1]): return "continue"
         self.optimizer.zero_grad()
         self.train_step += 1
         label = torch.tensor(label, dtype=torch.long)
-        x_1_logit, x_2_logit = self.model(data)
+        x_1_logit, x_2_logit = self.model(data, fine_tuning=True)
         loss = self.crit(x_2_logit, label.to(self.device))
         return loss
 
-    def eval_step(self, data, n_con, total_loss):
+    def eval_process(self, data, n_con, total_loss):
         b_neg = data[2]
-        if len(data[0]) != self.batch_size: return "continue"
+        if len(data[0][0]) != self.batch_size: return "continue", n_con, total_loss
         n_con += 1
-        eva_lg_e, eva_lg_b = self.model(data)
+        eva_lg_e, eva_lg_b = self.model(data, fine_tuning=True)
         loss = self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))
         prob = nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1)
         total_loss += loss.item()
         for b_sample in b_neg:
             data = (data[0], b_sample)
-            x_1_eva_f_lg, x_2_eva_f_lg = self.model(data)
+            x_1_eva_f_lg, x_2_eva_f_lg = self.model(data, fine_tuning=True)
             #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
             loss = self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
             total_loss += loss.item()

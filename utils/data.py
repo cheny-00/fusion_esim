@@ -163,7 +163,7 @@ class UbuntuCorpus(Dataset):
 
 
     def __len__(self):
-        return len(self.data[0][0])
+        return len(self.data[0])
     @staticmethod
     def get_item(idx, data, train):
         if train:
@@ -181,9 +181,7 @@ class UbuntuCorpus(Dataset):
     def __getitem__(self, idx):
         # input : context, response, label/ neg_samples
         # output: (context, context_len), (response, response_len), ...
-        w2v_data, b_data = self.data[0], self.data[1]
-        return (self.get_item(idx, w2v_data, self.type=='train'),
-                self.get_item(idx, b_data, self.type=='train'))
+        return self.get_item(idx, self.data, self.type=='train')
 
     def dump(self, data, path):
         with open(path, 'wb') as f:
@@ -243,13 +241,14 @@ if __name__ == '__main__':
 
     path = '/remote_workspace/dataset/default/valid.csv'
     train_path = '/remote_workspace/dataset/default/train.csv'
-    save_path = '/remote_workspace/fusion_esim/data/examples'
+    save_path = '/remote_workspace/fusion_esim/data/bert'
     model_name = 'bert'
     bert_path = '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8'
-    val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
-    # train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
-    val_dataloader = DataLoader(val_dataset, batch_size=5, collate_fn=ub_corpus_test_collate_fn)
-    # train_dataloader = DataLoader(train_dataset, batch_size=16, collate_fn=ub_corpus_train_collate_fn)
+    # val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    # val_dataloader = DataLoader(val_dataset, batch_size=5, collate_fn=ub_corpus_test_collate_fn)
+    train_dataloader = DataLoader(train_dataset, batch_size=16, collate_fn=ub_corpus_train_collate_fn)
+    print()
     # while 1:
     # #
     #     # for i, (c, s, n) in enumerate(val_dataloader):

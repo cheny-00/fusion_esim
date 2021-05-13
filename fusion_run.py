@@ -183,7 +183,7 @@ def main(args):
         train_model.fusion_train(epoch,
                                  scheduler=scheduler,
                                  warmup_step=args.warmup_step)
-        if (epoch + 1) % args.eval_interval == 0:
+        if (epoch + 1) % args.eval_interval == 0 or epoch + 1 == args.epochs:
             eva, eval_loss = train_model.fusion_evaluate()
 
             # save best
@@ -196,7 +196,7 @@ def main(args):
                     "model": model.state_dict(),
                     "best_score": best_score,
                     "optimizer": optimizer.state_dict(),
-                    "train_loss": train_model.get_train_loss(),
+                    "train_loss": train_model.get_train_loss,
                     "score": eva},
                     os.path.join(save_dir, "best.pth.tar"))
             if args.scheduler == 'dev_perf':
@@ -206,7 +206,7 @@ def main(args):
                             optimizer,
                             save_dir,
                             epoch,
-                            train_model.get_train_loss(),
+                            train_model.get_train_loss,
                             best_score)
         if not args.scheduler == 'dev_perf':
             scheduler.step()

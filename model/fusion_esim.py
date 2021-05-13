@@ -74,7 +74,7 @@ class ESIM_like(nn.Module):
         # Initialize all weights and biases in the model.
         self.apply(_init_weights)
 
-    def forward(self, w2v_data, b_data):
+    def forward(self, b_data):
         # inp = tuple(zip(*(w2v_data, b_data))) # c, c_l, r, r_l
         context_len, response_len = None, None
         context_embed, response_embed = tuple(map(lambda x:self.bert_embeddings(x[0].clone().detach().cuda()), b_data[:2]))
@@ -216,8 +216,7 @@ class FusionEsim(nn.Module):
     def forward(self,
                 br,
                 fine_tuning=False):
-        if not fine_tuning:
-            esim_logit = self.ESIM(br)
+        esim_logit = self.ESIM(br) if not fine_tuning else 0
         bert_logit = self.Bert(*br[0], *br[1])
 
         return esim_logit, bert_logit
