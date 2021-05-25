@@ -17,7 +17,8 @@ class Trainer():
                  logging,
                  log_interval,
                  plotter,
-                 model_name
+                 model_name,
+                 train_loss
                  ):
 
         self.model = model
@@ -32,7 +33,7 @@ class Trainer():
         self.log_interval = log_interval
         self.plotter = plotter
         self.train_step = 0
-        self.train_loss = 0
+        self.train_loss = train_loss
         self.model_name = model_name
         if self.crit == "cross_entropy":
             self.crit = nn.CrossEntropyLoss()

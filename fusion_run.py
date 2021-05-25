@@ -96,27 +96,22 @@ def main(args):
     ###############################################################################
     # Build the model
     ###############################################################################
-    if args.restart:
-        with open(os.path.join(args.restart_dir, 'model.pt'), 'rb') as f:
-            model = torch.load(f)
-        if not args.fp16:
-            model = model.float()
-    else:
-        if args.model == 'fusion_esim':
-            model = fusion_esim.FusionEsim(BERT=bert,
-                                           n_bert_token=train_dataset.Vocab.n_bert_token,
-                                           n_token=-1,
-                                           input_size=args.d_embed,
-                                           hidden_size=args.d_model,
-                                           dropout=args.dropout,
-                                           dropatt=args.dropatt,
-                                           embedding_layer=embedding_layer,
-                                           n_layer=args.n_layer)
+
+    if args.model == 'fusion_esim':
+        model = fusion_esim.FusionEsim(BERT=bert,
+                                       n_bert_token=train_dataset.Vocab.n_bert_token,
+                                       n_token=-1,
+                                       input_size=args.d_embed,
+                                       hidden_size=args.d_model,
+                                       dropout=args.dropout,
+                                       dropatt=args.dropatt,
+                                       embedding_layer=embedding_layer,
+                                       n_layer=args.n_layer)
 
     if args.optim.lower() == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.mom)
     elif args.optim.lower() == 'adam':
-            optimizer = optim.Adam(model.parameters(), lr=args.lr)
+        optimizer = optim.Adam(model.parameters(), lr=args.lr)
     elif args.optim.lower() == 'adagrad':
         optimizer = optim.Adagrad(model.parameters(), lr=args.lr)
 
@@ -161,9 +156,16 @@ def main(args):
     ###############################################################################
     # Train & validate
     ###############################################################################
-    save_dir = os.path.join(args.save_dir, time.strftime('%Y%m%d-%H%M%S'))
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    best_score, ckpt_epoch, train_loss = 0, 1, 0
+    if args.restart:
+        with open(args.restart_dir, 'rb') as f:
+            ckpt = torch.load(f)
+            ckpt_epoch, best_score, train_loss = ckpt['epoch'], ckpt['best_score'], ckpt['train_loss']
+            assert ckpt_epoch < args.epochs, 'out of boundary'
+            optimizer.load_state_dict(ckpt['optimizer'])
+            model.load_state_dict(ckpt['model'])
+        if not args.fp16:
+            model = model.float()
     crit = args.crit
     if args.fine_tuning: TrainerClass = FineTuningTrainer
     else: TrainerClass = LSTMTrainer
@@ -177,33 +179,35 @@ def main(args):
                                logging=logging,
                                log_interval=args.log_interval,
                                plotter=plotter,
-                               model_name=model_name)
+                               model_name=model_name,
+                               train_loss=train_loss)
 
-    best_score = 0
+    save_dir = os.path.join(args.save_dir, time.strftime('%Y%m%d-%H%M%S'))
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
-    for epoch in range(args.epochs):
+    for epoch in range(ckpt_epoch, args.epochs + 1):
         train_model.fusion_train(epoch,
                                  scheduler=scheduler,
                                  warmup_step=args.warmup_step)
-        if (epoch + 1) % args.eval_interval == 0 or epoch + 1 == args.epochs or args.fine_tuning:
+        if epoch % args.eval_interval == 0 or epoch == args.epochs or args.fine_tuning:
             eva, eval_loss = train_model.fusion_evaluate()
 
             # save best
             if not best_score:
                 best_score = eva
-            elif eva[1] + eva[2] > best_score[1] + best_score[2]:
+            elif eva[1] > best_score[1] :
                 best_score = eva
                 torch.save({
                     "epoch": epoch,
                     "model": model.state_dict(),
                     "best_score": best_score,
                     "optimizer": optimizer.state_dict(),
-                    "train_loss": train_model.get_train_loss,
-                    "score": eva},
+                    "train_loss": train_model.get_train_loss},
                     os.path.join(save_dir, "best.pth.tar"))
             if args.scheduler == 'dev_perf':
                 scheduler.step(eva[1])
-        if not (epoch + 1) % 10 or args.fine_tuning:
+        if not epoch % 10 or args.fine_tuning:
             save_checkpoint(model,
                             optimizer,
                             save_dir,
@@ -236,7 +240,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--embed_type', type=int, default=1,
                         help='embedding type')
-    parser.add_argument("--model", type=str, default="Transformer_XL",
+    parser.add_argument("--model", type=str, default="fusion_esim",
                         help='model')
     parser.add_argument('--n_layer', type=int, default=6,
                         help='number of total layers')
