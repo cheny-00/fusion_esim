@@ -204,9 +204,9 @@ class UbuntuCorpus(Dataset):
         n_sample = len(data[2])
         neg_line = list()
         features = dict()
-        features["anno_seq"] = [anno_seq]
-        features["seg_ids"] = [seg_ids]
-        features["attn_mask"] = [attn_mask]
+        features["anno_seq"] = [torch.tensor(anno_seq, dtype=torch.long)]
+        features["seg_ids"] = [torch.tensor(seg_ids, dtype=torch.long)]
+        features["attn_mask"] = [torch.tensor(attn_mask, dtype=torch.long)]
 
         for neg in range(n_sample):
             neg_seq = data[2][neg][idx]

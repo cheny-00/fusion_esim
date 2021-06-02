@@ -63,18 +63,13 @@ def main(args):
                                 bert_path=args.bert_path)
     train_iter = DataLoader(train_dataset,
                             batch_size=args.batch_size,
-                            collate_fn=ub_corpus_train_collate_fn,
-                            num_workers=8,
                             drop_last=True,
                             shuffle=True
                             )
     eval_iter = DataLoader(eval_dataset,
                            batch_size=args.batch_size,
-                           collate_fn=ub_corpus_test_collate_fn,
-                           num_workers=8,
                            drop_last=True,
                            shuffle=False)
-
 
 
     ## Build Bert model

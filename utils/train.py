@@ -121,11 +121,20 @@ class Trainer():
     def get_train_loss(self):
         return self.train_loss
 
+
+    @staticmethod
+    def batch_bert_data(batch, data, idx):
+        for key in data:
+            if key == 'esim_data': continue
+            batch[key] = data[key][idx].cuda()
+        return batch
+
+
 class LSTMTrainer(Trainer):
 
     def train_process(self, data):
 
-        label = data[2]
+        label = data["label"]
         if len(label) != self.batch_size: return "continue"
         elif not set(list(label)) == set([0, 1]): return "continue"
         self.optimizer.zero_grad()
@@ -138,18 +147,23 @@ class LSTMTrainer(Trainer):
         return loss
 
     def eval_process(self, data, n_con, total_loss):
-        b_neg = data[2]
-        if len(data[0][0]) != self.batch_size: return "continue"
+        b_neg = data["label"][2]
+        if len(data["esim_data"][0][0]) != self.batch_size: return "continue"
         n_con += 1
-        eva_lg_e, eva_lg_b = self.model(data)
+        batch = dict()
+        batch["esim_data"] = data["esim_data"]
+        batch = self.batch_bert_data(batch, data, 0)
+        eva_lg_e, eva_lg_b = self.model(batch)
         loss = (self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device)) +
                 self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))) / 2
         prob = nn.functional.softmax(nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1) +
                                      nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1), dim=1)
         total_loss += loss.item()
-        for b_sample in b_neg:
-            data = (data[0], b_sample)
-            x_1_eva_f_lg, x_2_eva_f_lg = self.model(data)
+        for idx, b_sample in enumerate(b_neg):
+            batch = dict()
+            batch['esim_data'] = (data["esim_data"][0], b_sample)
+            batch = self.batch_bert_data(batch, data, idx + 1)
+            x_1_eva_f_lg, x_2_eva_f_lg = self.model(batch)
             #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
             loss = (self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) +
                     self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))) / 2
@@ -163,7 +177,7 @@ class LSTMTrainer(Trainer):
 class FineTuningTrainer(Trainer):
 
     def train_process(self, data):
-        label = data[2]
+        label = data["label"].tolist()
         if len(label) != self.batch_size: return "continue"
         elif not set(list(label)) == set([0, 1]): return "continue"
         self.optimizer.zero_grad()
@@ -174,16 +188,21 @@ class FineTuningTrainer(Trainer):
         return loss
 
     def eval_process(self, data, n_con, total_loss):
-        b_neg = data[2]
-        if len(data[0][0]) != self.batch_size: return "continue", n_con, total_loss
+        b_neg = data["esim_data"][2]
+        if len(data["esim_data"][0][0]) != self.batch_size: return "continue", n_con, total_loss
         n_con += 1
-        eva_lg_e, eva_lg_b = self.model(data, fine_tuning=True)
+        batch = dict()
+        batch["esim_data"] = data["esim_data"]
+        batch = self.batch_bert_data(batch, data, 0)
+        eva_lg_e, eva_lg_b = self.model(batch, fine_tuning=True)
         loss = self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))
         prob = nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1)
         total_loss += loss.item()
-        for b_sample in b_neg:
-            data = (data[0], b_sample)
-            x_1_eva_f_lg, x_2_eva_f_lg = self.model(data, fine_tuning=True)
+        for idx, b_sample in enumerate(b_neg):
+            batch = dict()
+            batch['esim_data'] = (data["esim_data"][0], b_sample)
+            batch = self.batch_bert_data(batch, data, idx)
+            x_1_eva_f_lg, x_2_eva_f_lg = self.model(batch, fine_tuning=True)
             #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
             loss = self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
             total_loss += loss.item()

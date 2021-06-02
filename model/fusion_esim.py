@@ -143,14 +143,6 @@ class ESIM_like(nn.Module):
         logit = self._classifier(aggregated)
         return logit
 
-    @staticmethod
-    def __padding(x_1, x_2):
-        # x_1: w2v_data, x_2 => bert_data
-        if x_1.size(1) < x_2.size(1):
-            x_1 = torch.cat((x_1, torch.zeros(x_1.size(0),
-                                              x_2.size(1)-x_1.size(1),
-                                              x_1.size(2)).cuda()), dim=1)
-        return x_1[:, :x_2.size(1), :], x_2
 
 class Bert(nn.Module):
 
@@ -169,31 +161,8 @@ class Bert(nn.Module):
                                          self.drop,
                                          nn.Linear(bert_dim, 2))
 
-    def forward(self, c, c_len, r, r_len):
-        SEP, UNK = 102, 100
-        c, r = c.clone().detach().cuda(), r.clone().detach().cuda()
-        c_len, r_len = c_len.cuda(), r_len.cuda()
-        # c, r = c.masked_fill(c > self.n_bert_token, torch.tensor(UNK)), \
-        #        r.masked_fill(r > self.n_bert_token, torch.tensor(UNK))
-        c_mask = get_mask_from_seq_lens(c_len)
-        convert_pad = torch.ones_like(c) * SEP * torch.logical_not(c_mask)
-        c += convert_pad
-        if c.size(1) + r.size(1) > 512:
-            r = r[:, :257]
-            d = 512 - r.size(1)
-            c = c[:, :d]
-            r_len.clamp_(max=257)
-        input_ids = torch.cat((c, r[:, 1:]), dim=1)
-        input_len = c.size(1) + r_len - 1
-        attn_mask = get_mask_from_seq_lens(input_len, 511)
-        token_ids = torch.cat((torch.zeros(c.size()[:2]),
-                               torch.ones(r.size(0), r.size(1)-1)), dim=1).long().cuda()
+    def forward(self, input_ids, attn_mask, token_ids):
 
-        if not input_ids.size(1) == attn_mask.size(1):
-            print(input_ids.size(), attn_mask.size(), input_len)
-            print(c.size(), r.size(), r_len)
-            raise AssertionError
-       # # input_ids, attn_mask, token_ids =
         output = self.BERT(input_ids=input_ids,
                            attention_mask=attn_mask,
                            token_type_ids=token_ids).last_hidden_state
@@ -214,10 +183,11 @@ class FusionEsim(nn.Module):
                          kwargs['dropout'])
         self.crit = nn.CrossEntropyLoss()
     def forward(self,
-                br,
-                fine_tuning=False):
-        esim_logit = self.ESIM(br) if not fine_tuning else 0
-        bert_logit = self.Bert(*br[0], *br[1])
+                data,
+                fine_tuning=False,
+                eval_step=False):
+        esim_logit = self.ESIM(data["esim_data"]) if not fine_tuning else 0
+        bert_logit = self.Bert(data["anno_seq"].cuda(), data["attn_mask"].cuda(), data["seg_ids"].cuda()) if not eval_step else 0
 
         return esim_logit, bert_logit
 
