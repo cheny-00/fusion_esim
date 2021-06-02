@@ -44,6 +44,12 @@ class Vocab(object):
         self.special = special
         self.offset = 0
 
+        self.do_eou = True
+        self.do_eot = True
+
+        self.max_context_len = 280
+        self.max_response_len = 40
+
         self.lower_case = lower_case
         self.model_name = model_name
         if 'distilbert' in model_name:
@@ -53,15 +59,26 @@ class Vocab(object):
             self.tokenizer = BertTokenizer.from_pretrained(bert_path if bert_path else model_name,
                                                            do_lower_case=lower_case)
             self.n_bert_token = self.tokenizer.vocab_size
+        if self.do_eot:
+            self.tokenizer.add_tokens(["[EOU]", "[EOT]"])
 
+    def pre_tokenize(self, line, iscontext):
+        replace_token = {"__eou__":"[EOU]",
+                         "__eot__": "[EOT]"}
+        sp = self.special
+        line = line.replace("__eou__", "[EOU]")
+        line = line.replace("__eot__", "[EOT]")
+        # line = [replace_token[x] if x in sp else x for x in line]
 
-    def pre_tokenize(self, line):
-        for token in self.special:
-            line = line.replace(token, "")
+        max_len, rm_pos = (self.max_context_len, 0) if iscontext else (self.max_response_len, -1)
+        line = self.tokenizer.tokenize(line)
+        while len(line) > max_len - rm_pos - 2:
+            line.pop(rm_pos)
+        # for token in self.special:
+        #     line = line.replace(token, "")
         return line
-    def tokenize(self, line): #TODO remove special tokens, split turn
-
-        encoded_line = self.tokenizer.encode(self.pre_tokenize(line), add_special_tokens=True, truncation=True)
+    def tokenize(self, line, iscontext): #TODO remove special tokens, split turn
+        encoded_line = self.tokenizer.convert_tokens_to_ids(self.pre_tokenize(line, iscontext))
         # TODO add_special_tokens & truncation
         return encoded_line
 
@@ -117,11 +134,11 @@ class Vocab(object):
             self.progress.update(task, total=len(c))
             self.progress.start_task(task)
             for idx in range(len(c)):
-                c_res.append(func(c[idx]))
-                r_res.append(func(r[idx]))
+                c_res.append(func(c[idx], True))
+                r_res.append(func(r[idx], False))
                 if not train:
                     for i, neg in enumerate(n_samples):
-                        n_res[i].append(func(neg[idx]))
+                        n_res[i].append(func(neg[idx], False))
                 self.progress.update(task, advance=1)
         return c_res, r_res, l if train else n_res
 
@@ -141,7 +158,10 @@ class UbuntuCorpus(Dataset):
         self.path = path
         self.type = type
         self.dataset = None
+        self.max_context_len = 280
+        self.max_response_len = 40
         self.Vocab = Vocab(**kwargs)
+
 
         assert os.path.exists(save_path)
         s_path = os.path.join(save_path, type)
@@ -157,31 +177,52 @@ class UbuntuCorpus(Dataset):
                 self.Vocab.build_worddict(*self.data)
                 self.dump(self.Vocab.worddict, os.path.join(save_path, 'worddict'))
             # build_worddict first
-            assert self.Vocab.worddict, 'make suere worddict exist'
+            assert self.Vocab.worddict, 'make sure worddict exist'
             self.dump(self.data, s_path)
 
 
 
     def __len__(self):
         return len(self.data[0])
+
     @staticmethod
-    def get_item(idx, data, train):
+    def get_item(idx, data, train, max_context_len, max_response_len):
+        context, response = data[0][idx], data[1][idx]
+        anno_seq, seg_ids, attn_mask = bert_input_data(context, response, max_context_len, max_response_len)
         if train:
-            return (torch.tensor(data[0][idx], dtype=torch.long), len(data[0][idx])),\
-                   (torch.tensor(data[1][idx], dtype=torch.long), len(data[1][idx])),\
-                   data[2][idx]
-        else:
-            n_sample = len(data[2])
-            neg_line = []
-            for neg in range(n_sample):
-                neg_line.append((torch.tensor(data[2][neg][idx]), len(data[2][neg][idx])))
-            return (torch.tensor(data[0][idx]), len(data[0][idx])),\
-                   (torch.tensor(data[1][idx]), len(data[1][idx])),\
-                   neg_line
+            label = data[2][idx]
+            features = dict()
+            features["esim_data"] = ((torch.tensor(anno_seq[:max_context_len], dtype=torch.long), len(context)),
+                                     (torch.tensor(anno_seq[max_context_len:], dtype=torch.long), len(response)),
+                                     label)
+            features["anno_seq"] = torch.tensor(anno_seq, dtype=torch.long)
+            features["seg_ids"] = torch.tensor(seg_ids, dtype=torch.long)
+            features["attn_mask"] = torch.tensor(attn_mask, dtype=torch.long)
+            features["label"] = label
+            return features
+
+        n_sample = len(data[2])
+        neg_line = list()
+        features = dict()
+        features["anno_seq"] = [anno_seq]
+        features["seg_ids"] = [seg_ids]
+        features["attn_mask"] = [attn_mask]
+
+        for neg in range(n_sample):
+            neg_seq = data[2][neg][idx]
+            anno, seg, attn = bert_input_data(context, neg_seq, max_context_len, max_response_len)
+            features["anno_seq"].append(torch.tensor(anno, dtype=torch.long))
+            features["seg_ids"].append(torch.tensor(seg, dtype=torch.long))
+            features["attn_mask"].append(torch.tensor(attn, dtype=torch.long))
+            neg_line.append((torch.tensor(anno[max_context_len:], dtype=torch.long), len(neg_seq)))
+        features["esim_data"] = ((torch.tensor(anno_seq[:max_context_len], dtype=torch.long), len(context)),
+                                 (torch.tensor(response[max_context_len:], dtype=torch.long), len(response)),
+                                 neg_line)
+        return features
     def __getitem__(self, idx):
         # input : context, response, label/ neg_samples
         # output: (context, context_len), (response, response_len), ...
-        return self.get_item(idx, self.data, self.type=='train')
+        return self.get_item(idx, self.data, self.type=='train', self.max_context_len, self.max_response_len)
 
     def dump(self, data, path):
         with open(path, 'wb') as f:
@@ -197,6 +238,36 @@ class UbuntuCorpus(Dataset):
         with open(path, 'rb') as f:
             data = dill.load(f)
         return data
+
+def max_trim(text, max_len, rm_pos):
+    while max_len < len(text):
+        text.pop(rm_pos)
+    return text
+
+def bert_input_data(context, response, max_context_len=280, max_response_len=40, PAD=0, CLS=101, SEP=102):
+
+    context, response = max_trim(context, max_context_len - 2, 0), max_trim(response, max_response_len - 1, -1)
+    context = [101] + context + [102]
+    segment_ids = [0] * max_context_len
+    attn_mask = [1] * len(context)
+
+    while len(context) < max_context_len:
+        context.append(0)
+        attn_mask.append(0)
+    assert len(context) == len(segment_ids) == len(attn_mask)
+
+    response = response + [102]
+    segment_ids.extend([1] * len(response))
+    attn_mask.extend([1] * len(response))
+
+    while len(response) < max_response_len:
+        response.append(0)
+        segment_ids.append(0)
+        attn_mask.append(0)
+    context_response = context + response
+
+    assert len(context_response) == len(segment_ids) == len(attn_mask)
+    return context_response, segment_ids, attn_mask
 
 
 def ub_corpus_train_collate_fn(data):
@@ -241,14 +312,13 @@ if __name__ == '__main__':
 
     path = '/remote_workspace/dataset/default/valid.csv'
     train_path = '/remote_workspace/dataset/default/train.csv'
-    save_path = '/remote_workspace/fusion_esim/data/bert'
+    save_path = '/remote_workspace/fusion_esim/data/bert_with_eot'
     model_name = 'bert'
-    bert_path = '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8'
-    # val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    bert_path = '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-12_H-768_A-12'
     train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
-    # val_dataloader = DataLoader(val_dataset, batch_size=5, collate_fn=ub_corpus_test_collate_fn)
-    train_dataloader = DataLoader(train_dataset, batch_size=16, collate_fn=ub_corpus_train_collate_fn)
-    print()
+    val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    val_dataloader = DataLoader(val_dataset, batch_size=16, num_workers=8)
+    train_dataloader = DataLoader(train_dataset, batch_size=16, num_workers=8)
     # while 1:
     # #
     #     # for i, (c, s, n) in enumerate(val_dataloader):
