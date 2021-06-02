@@ -2,6 +2,7 @@ import os
 import time
 import torch
 import torch.nn as nn
+from tqdm import  tqdm
 from eval.evaluation import eval_samples
 from utils import get_mask_from_seq_lens
 class Trainer():
@@ -54,6 +55,7 @@ class Trainer():
                     print('WARNING: apex not installed, ignoring --fp16 option')
                     self.fp16 = False
 
+
     def train_process(self, *args):
         return NotImplementedError()
     def eval_process(self, *args):
@@ -63,7 +65,8 @@ class Trainer():
                      **kwargs):
         self.model.train()
         log_start_time = 0
-        for batch, data in enumerate(self.train_iter):
+        tqdm_train_iter = tqdm(self.train_iter)
+        for batch, data in enumerate(tqdm_train_iter):
             loss = self.train_process(data)
             if type(loss) is str: continue
             if self.fp16:
@@ -87,7 +90,8 @@ class Trainer():
                 log_str = '| epoch {:3d} step {:>8d} | {:>6d} batches | lr {:.3g} ' \
                           '| ms/batch {:5.2f} | loss {}'.format(epoch_num, self.train_step, batch+1, self.optimizer.param_groups[0]['lr'],
                                                                 elapsed * 1000 / self.log_interval, cur_loss)
-                self.logging(log_str)
+                self.logging(log_str, print_=False)
+                tqdm_train_iter.set_description(log_str, refresh=False)
                 self.plotter.plot('train_loss', 'train', 'loss curve', self.train_step, cur_loss)
                 self.train_loss = 0
                 log_start_time = time.time()
@@ -99,22 +103,25 @@ class Trainer():
         total_loss, n_con, eval_start_time = 0, 0, 0
         prob_set = []
 
+        tqdm_eval_iter = tqdm(self.eval_iter)
         with torch.no_grad():
 
-            for i, data in enumerate(self.eval_iter):
+            for i, data in enumerate(tqdm_eval_iter):
                 prob, n_con, total_loss = self.eval_process(data, n_con, total_loss)
                 if type(prob) is str: continue
                 prob_set.append(prob.tolist())
             eva = eval_samples(prob_set)
-        self.logging('-' * 100)
+        self.logging('-' * 100, print_=False)
         log_str = '| Eval at step {:>8d} | time: {:5.2f}s ' \
                   '| valid loss {:5.4f} | R_1@2 {:5.4f} | R_1@10 {:5.4f} | R_2@10 {:5.4f} |'\
                   ' R_5@10 {:5.4f} | MAP {:5.4f} | MRR {:5.4f}  '.format(self.train_step,
                                                                          (time.time() - eval_start_time),
                                                                          total_loss / (n_con * 10),
                                                                          eva[0], eva[1], eva[2], eva[3], eva[4], eva[5])
-        self.logging(log_str)
-        self.logging('-' * 100)
+        self.logging(log_str, print_=False)
+        self.logging('-' * 100, print_=False)
+        tqdm_eval_iter.set_description(log_str)
+
         self.model.train()
         return eva, (total_loss / (n_con * 10))
     @property
