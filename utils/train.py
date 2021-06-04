@@ -64,7 +64,7 @@ class Trainer():
                      epoch_num,
                      **kwargs):
         self.model.train()
-        log_start_time = 0
+        log_start_time = time.time()
         tqdm_train_iter = tqdm(self.train_iter)
         for batch, data in enumerate(tqdm_train_iter):
             loss = self.train_process(data)
@@ -100,7 +100,7 @@ class Trainer():
 
         self.model.eval()
 
-        total_loss, n_con, eval_start_time = 0, 0, 0
+        total_loss, n_con, eval_start_time = 0, 0, time.time()
         prob_set = []
 
         tqdm_eval_iter = tqdm(self.eval_iter)

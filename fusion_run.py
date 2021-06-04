@@ -157,8 +157,8 @@ def main(args):
             ckpt = torch.load(f)
             ckpt_epoch, best_score, train_loss = ckpt['epoch'], ckpt['best_score'], ckpt['train_loss']
             assert ckpt_epoch < args.epochs, 'out of boundary'
-            optimizer.load_state_dict(ckpt['optimizer'])
-            model.load_state_dict(ckpt['model'])
+            optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+            model.load_state_dict(ckpt['model_state_dict'])
         if not args.fp16:
             model = model.float()
     crit = args.crit

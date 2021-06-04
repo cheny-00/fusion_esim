@@ -40,15 +40,16 @@ def save_checkpoint(model,
                     save_dir,
                     epoch,
                     train_loss,
-                    best_score):
+                    best_score,
+                    model_name='ESIM_like'):
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
     torch.save({
         "epoch": epoch,
-        "model": model.state_dict(),
+        "model_state_dict": model.state_dict(),
         "best_score": best_score,
-        "optimizer": optimizer.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
         "train_loss": train_loss},
-        os.path.join(save_dir, "ESIM_like_{}.pth.tar".format(epoch)))
+        os.path.join(save_dir, "{}_{}.pth.tar".format(model_name, epoch)))
