@@ -79,9 +79,12 @@ def main(args):
         ModelClass = BertModel
     elif 'distilbert' in model_name:
         ModelClass = DistilBertModel
-    pre_trianed_state = torch.load(os.path.join(args.bert_path, 'pytorch_model.bin') if not args.load_post_trained_bert
-                                   else args.load_post_trained_bert,
-                                   map_location='cpu')
+    if args.load_post_trained_bert:
+        pre_trianed_state  = torch.load(args.load_post_trained_bert, map_location='cpu')['model_state_dict']
+        bert_config.vocab_size += 2
+    else:
+        pre_trianed_state = torch.load(os.path.join(args.bert_path, 'pytorch_model.bin'),
+                                       map_location='cpu')
     bert = ModelClass.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_trianed_state)
     del pre_trianed_state
 
@@ -176,7 +179,8 @@ def main(args):
                                log_interval=args.log_interval,
                                plotter=plotter,
                                model_name=model_name,
-                               train_loss=train_loss)
+                               train_loss=train_loss,
+                               distill_loss_fn=args.distill_loss_fn)
 
     save_dir = os.path.join(args.save_dir, time.strftime('%Y%m%d-%H%M%S'))
     if not os.path.exists(save_dir):
@@ -322,6 +326,10 @@ if __name__ == "__main__":
                         help='select a pre trained model')
     parser.add_argument('--load_post_trained_bert', type=str, default="",
                         help="load post-trained BERT")
+    parser.add_argument('--distill_loss_fn', type=str, default="mse",
+                        help="loss function for distillation")
+    parser.add_argument('--temperature', type=str, default=1,
+                        help="distillation temperature")
     args = parser.parse_args()
     # Validate `--fp16` option
     if args.fp16:

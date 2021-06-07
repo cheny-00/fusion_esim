@@ -4,7 +4,14 @@ import torch
 import torch.nn as nn
 from tqdm import  tqdm
 from eval.evaluation import eval_samples
+from functools import partial
 from utils import get_mask_from_seq_lens
+
+def soft_cross_entropy(predicts, targets, temp):
+        student_likelihood = torch.nn.functional.log_softmax(predicts / temp, dim=-1)
+        targets_prob = torch.nn.functional.softmax(targets / temp, dim=-1)
+        return (- targets_prob * student_likelihood).mean()
+
 class Trainer():
 
     def __init__(self,
@@ -19,7 +26,9 @@ class Trainer():
                  log_interval,
                  plotter,
                  model_name,
-                 train_loss
+                 train_loss,
+                 distill_loss_fn,
+                 temperature
                  ):
 
         self.model = model
@@ -36,13 +45,8 @@ class Trainer():
         self.train_step = 0
         self.train_loss = train_loss
         self.model_name = model_name
-        if self.crit == "cross_entropy":
-            self.crit = nn.CrossEntropyLoss()
-        elif self.crit == "mse":
-            self.crit == nn.MSELoss()
-        elif self.crit == "distillation":
-            self.crit = nn.CrossEntropyLoss()
-            self.logit_crit = nn.MSELoss()
+        self.distill_loss_fn = self.select_loss_fn(distill_loss_fn, temperature)
+        self.crit = self.select_loss_fn(crit)
 
         if self.fp16:
             if not 'cuda' in self.device.type:
@@ -54,7 +58,17 @@ class Trainer():
                 except:
                     print('WARNING: apex not installed, ignoring --fp16 option')
                     self.fp16 = False
-
+    @staticmethod
+    def select_loss_fn(loss_fn_name, temp=1):
+        if loss_fn_name == "cross_entropy":
+            loss_fn = nn.CrossEntropyLoss()
+        elif loss_fn_name == "mse":
+            loss_fn = nn.MSELoss()
+        elif loss_fn_name == "kl_d":
+            loss_fn = nn.KLDivLoss
+        elif loss_fn_name == "soft_cross_entropy":
+            loss_fn = partial(soft_cross_entropy, temp=temp)
+        return loss_fn
 
     def train_process(self, *args):
         return NotImplementedError()
@@ -149,9 +163,9 @@ class LSTMTrainer(Trainer):
         label = torch.tensor(label, dtype=torch.long)
 
         x_1_logit, x_2_logit = self.model(data)
-        loss = (self.crit(x_1_logit, label.to(self.device)) +
-                self.crit(x_2_logit, label.to(self.device))) / 2
-        return loss
+        distill_loss = self.distill_loss_fn(x_1_logit, x_2_logit)
+        loss = self.crit(x_1_logit, label.to(self.device))
+        return loss + distill_loss
 
     def eval_process(self, data, n_con, total_loss):
         b_neg = data["label"][2]
