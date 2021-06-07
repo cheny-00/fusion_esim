@@ -79,9 +79,10 @@ def main(args):
         ModelClass = BertModel
     elif 'distilbert' in model_name:
         ModelClass = DistilBertModel
-    pre_trianed_state = torch.load(os.path.join(args.bert_path, 'pytorch_model.bin'),
+    pre_trianed_state = torch.load(os.path.join(args.bert_path, 'pytorch_model.bin') if not args.load_post_trained_bert
+                                   else args.load_post_trained_bert,
                                    map_location='cpu')
-    bert = ModelClass.from_pretrained(args.bert_path, state_dict=pre_trianed_state)
+    bert = ModelClass.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_trianed_state)
     del pre_trianed_state
 
     ## build word embedding
@@ -319,6 +320,8 @@ if __name__ == "__main__":
                              ' supersedes --static-loss-scale.')
     parser.add_argument('--model_name', type=str, default='en_core_web_sm',
                         help='select a pre trained model')
+    parser.add_argument('--load_post_trained_bert', type=str, default="",
+                        help="load post-trained BERT")
     args = parser.parse_args()
     # Validate `--fp16` option
     if args.fp16:
