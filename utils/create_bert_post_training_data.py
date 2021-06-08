@@ -372,7 +372,7 @@ if __name__ == "__main__":
                           default="/remote_workspace/dataset/default/train.csv",
                           help="Input raw text file (or comma-separated list of files).")
   arg_parser.add_argument("--output_file", dest="output_file", type=str,
-                          default="../data/bert/ubuntu_post_training.hdf5",
+                          default="../data/bert_with_eot/ubuntu_post_training.hdf5",
                           help="Output example pkl.")
   arg_parser.add_argument("--do_lower_case", dest="do_lower_case", type=bool, default=True,
                           help="Whether to lower case the input text. Should be True for uncased.")

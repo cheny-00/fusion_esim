@@ -64,4 +64,4 @@ class BertPostTrainingDataset(Dataset):
 
     return anno_masked_lm_labels
 if __name__ == "__main__":
-  train_dataset = BertPostTrainingDataset("/remote_workspace/fusion_esim/data/bert/ubuntu_post_training.hdf5", split="train")
+  train_dataset = BertPostTrainingDataset("/remote_workspace/fusion_esim/data/bert_with_eot/ubuntu_post_training.hdf5", split="train")

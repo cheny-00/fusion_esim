@@ -153,6 +153,11 @@ class Trainer():
 
 class LSTMTrainer(Trainer):
 
+    def get_loss(self, predicts, targets, label):
+        distill_loss = self.distill_loss_fn(predicts, targets)
+        loss = self.crit(predicts, label)
+        return distill_loss + loss
+
     def train_process(self, data):
 
         label = data["label"]
@@ -163,8 +168,7 @@ class LSTMTrainer(Trainer):
         label = torch.tensor(label, dtype=torch.long)
 
         x_1_logit, x_2_logit = self.model(data)
-        distill_loss = self.distill_loss_fn(x_1_logit, x_2_logit)
-        loss = self.crit(x_1_logit, label.to(self.device))
+        loss = self.get_loss(x_1_logit, x_2_logit， label)
         return loss + distill_loss
 
     def eval_process(self, data, n_con, total_loss):
@@ -175,10 +179,8 @@ class LSTMTrainer(Trainer):
         batch["esim_data"] = data["esim_data"]
         batch = self.batch_bert_data(batch, data, 0)
         eva_lg_e, eva_lg_b = self.model(batch)
-        loss = (self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device)) +
-                self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))) / 2
-        prob = nn.functional.softmax(nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1) +
-                                     nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1), dim=1)
+        loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device) 
+        prob = nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1)
         total_loss += loss.item()
         for idx, b_sample in enumerate(b_neg):
             batch = dict()
@@ -186,13 +188,11 @@ class LSTMTrainer(Trainer):
             batch = self.batch_bert_data(batch, data, idx + 1)
             x_1_eva_f_lg, x_2_eva_f_lg = self.model(batch)
             #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
-            loss = (self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device)) +
-                    self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))) / 2
+            loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
             total_loss += loss.item()
-            prob = torch.cat((prob, nn.functional.softmax(
-                nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1) + \
-                nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1), dim=1)),
-                             dim=1)
+            prob = torch.cat((prob, 
+                              nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1),
+                              dim=1)
         return prob, n_con, total_loss
 
 class FineTuningTrainer(Trainer):
