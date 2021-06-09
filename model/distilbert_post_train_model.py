@@ -11,7 +11,7 @@ class DistilBERTPostTrain(nn.Module):
                  config,
                  state_dict):
         super(DistilBERTPostTrain, self).__init__()
-        self.distilbert = DistilBertModel(config, state_dict=state_dict)
+        self.distilbert = DistilBertModel.from_pretrained(config, state_dict=state_dict)
         self.cls = BertPreTrainingHeads(config)
 
     def forward(
@@ -199,7 +199,7 @@ class ModelOutput(OrderedDict):
         # Don't call self.__setattr__ to avoid recursion errors
         super().__setattr__(key, value)
 
-    def to_tuple(self) -> Tuple[Any]:
+    def to_tuple(self):
         """
         Convert self to a tuple containing all the attributes/keys that are not ``None``.
         """
