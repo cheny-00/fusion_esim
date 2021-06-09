@@ -7,10 +7,11 @@ from collections import OrderedDict
 from dataclasses import dataclass, fields
 class DistilBERTPostTrain(nn.Module):
     def __init__(self,
+                 path,
                  config,
                  state_dict):
         super(DistilBERTPostTrain, self).__init__()
-        self.distilbert = DistilBertModel(config, state_dict=state_dict)
+        self.distilbert = DistilBertModel.from_pretrained(path, config, state_dict=state_dict)
         self.cls = BertPreTrainingHeads(config)
 
     def forward(
