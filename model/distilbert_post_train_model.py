@@ -1,9 +1,10 @@
 import math
 import torch
 import torch.nn as nn
-from transformers import DistilBertModel, BertForPreTrainingOutput
+from transformers import DistilBertModel
 from typing import Optional, Tuple
 from collections import OrderedDict, UserDict
+from dataclasses import dataclass
 
 class DistilBERTPostTrain(nn.Module):
     def __init__(self,
