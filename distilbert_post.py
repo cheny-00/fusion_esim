@@ -8,7 +8,9 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from transformers import BertForPreTraining, BertConfig
+from transformers import DistilBertForPreTraining, DistilBertConfig
+
+from .model.distilbert_post_train_model import *
 
 
 
@@ -53,8 +55,8 @@ def post_train(args):
         pre_train_state = torch.load(os.path.join(args.bert_path, 'pytorch_model.bin'),
                                      map_location='cpu')
 
-    bert_config = BertConfig.from_pretrained(args.bert_path)
-    model = BertForPreTraining.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_train_state)
+    bert_config = DistilBertConfig.from_pretrained(args.bert_path)
+    model = DistilBERTPostTrain(bert_config, pre_train_state)
     model.resize_token_embeddings(model.config.vocab_size + 2)
     del pre_train_state
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
