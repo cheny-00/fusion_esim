@@ -56,8 +56,8 @@ def post_train(args):
                                      map_location='cpu')
 
     bert_config = DistilBertConfig.from_pretrained(args.bert_path)
-    model = DistilBERTPostTrain(bert_config, pre_train_state)
-    model.resize_token_embeddings(model.config.vocab_size + 2)
+    model = DistilBERTPostTrain(args.bert_path, bert_config, pre_train_state)
+    model.distilbert.resize_token_embeddings(bert_config.vocab_size + 2)
     del pre_train_state
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     if optim_state_dict:
