@@ -191,7 +191,7 @@ class LSTMTrainer(Trainer):
             loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
             total_loss += loss.item()
             prob = torch.cat((prob, 
-                              nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1)),
+                              nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1),
                               dim=1)
         return prob, n_con, total_loss
 

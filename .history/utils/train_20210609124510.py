@@ -179,7 +179,7 @@ class LSTMTrainer(Trainer):
         batch["esim_data"] = data["esim_data"]
         batch = self.batch_bert_data(batch, data, 0)
         eva_lg_e, eva_lg_b = self.model(batch)
-        loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device))
+        loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device) 
         prob = nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1)
         total_loss += loss.item()
         for idx, b_sample in enumerate(b_neg):
@@ -191,7 +191,7 @@ class LSTMTrainer(Trainer):
             loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
             total_loss += loss.item()
             prob = torch.cat((prob, 
-                              nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1)),
+                              nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1),
                               dim=1)
         return prob, n_con, total_loss
 
