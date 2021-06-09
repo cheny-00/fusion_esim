@@ -81,6 +81,7 @@ def post_train(args):
             msk_lm_label = data["masked_lm_labels"]
             data["masked_lm_labels"] = torch.where(msk_lm_label == -1, torch.tensor(-100), msk_lm_label)
             loss = model(input_ids=data["input_ids"].to(device),
+                         labels=data["masked_lm_labels"].to(device),
                          attention_mask=data["attention_mask"].to(device)).loss
             
             loss.backward()
