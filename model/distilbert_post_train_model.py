@@ -237,4 +237,3 @@ class BertForPreTrainingOutput(ModelOutput):
     seq_relationship_logits: torch.FloatTensor = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
->>>>>>> e867ad97995b0498ce92417f4f6e08eb8f334782
