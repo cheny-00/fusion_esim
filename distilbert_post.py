@@ -8,9 +8,9 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from transformers import DistilBertForPreTraining, DistilBertConfig
+from transformers import DistilBertConfig
 
-from .model.distilbert_post_train_model import *
+from model.distilbert_post_train_model import *
 
 
 
