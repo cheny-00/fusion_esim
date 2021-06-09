@@ -1,4 +1,5 @@
 
+from transformers.utils.dummy_pt_objects import DistilBertForMaskedLM
 from utils.post_train_dataset import BertPostTrainingDataset
 from utils.exp_utils import create_exp_dir, save_checkpoint
 
@@ -56,8 +57,8 @@ def post_train(args):
                                      map_location='cpu')
 
     bert_config = DistilBertConfig.from_pretrained(args.bert_path)
-    model = DistilBERTPostTrain(bert_path, bert_config, pre_train_state)
-    model.resize_token_embeddings(model.config.vocab_size + 2)
+    model = DistilBertForMaskedLM.from_pretrained(args.bert_path, bert_config, pre_train_state)
+    model.resize_token_embeddings(bert_config.vocab_size + 2)
     del pre_train_state
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     if optim_state_dict:
@@ -80,10 +81,7 @@ def post_train(args):
             msk_lm_label = data["masked_lm_labels"]
             data["masked_lm_labels"] = torch.where(msk_lm_label == -1, torch.tensor(-100), msk_lm_label)
             loss = model(input_ids=data["input_ids"].to(device),
-                         token_type_ids=data["token_type_ids"].to(device),
-                         attention_mask=data["attention_mask"].to(device),
-                         labels=data["masked_lm_labels"].to(device),
-                         next_sentence_label=data["next_sentence_labels"].to(device)).loss
+                         attention_mask=data["attention_mask"].to(device))
             
             loss.backward()
             accu_loss += loss.item()
