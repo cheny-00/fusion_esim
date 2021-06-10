@@ -116,11 +116,12 @@ def post_train(args):
 
 
 if __name__ == "__main__":
+    home = "/home/cheny539"
     import argparse
     parser = argparse.ArgumentParser(description="Post train")
-    parser.add_argument("--dataset_path", type=str, default="/remote_workspace/dataset/default/",
+    parser.add_argument("--dataset_path", type=str, default=home + "/remote_workspace/dataset/default/",
                         help='path to dataset')
-    parser.add_argument("--examples_path", type=str, default="/remote_workspace/fusion_esim/data/bert/ubuntu_post_training.hdf5",
+    parser.add_argument("--examples_path", type=str, default=home + "/remote_workspace/fusion_esim/data/bert_with_eot/ubuntu_post_training.hdf5",
                         help='path to dump examples')
     parser.add_argument("--save_dir", type=str, default="../checkpoints",
                         help='checkpoints save dir')

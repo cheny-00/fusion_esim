@@ -159,41 +159,11 @@ class LSTMTrainer(Trainer):
         return distill_loss + loss
 
     def train_process(self, data):
+        pass
 
-        label = data["label"]
-        if len(label) != self.batch_size: return "continue"
-        elif not set(list(label)) == set([0, 1]): return "continue"
-        self.optimizer.zero_grad()
-        self.train_step += 1
-        label = torch.tensor(label, dtype=torch.long)
-
-        x_1_logit, x_2_logit = self.model(data)
-        loss = self.get_loss(x_1_logit, x_2_logit， label)
-        return loss + distill_loss
 
     def eval_process(self, data, n_con, total_loss):
-        b_neg = data["label"][2]
-        if len(data["esim_data"][0][0]) != self.batch_size: return "continue"
-        n_con += 1
-        batch = dict()
-        batch["esim_data"] = data["esim_data"]
-        batch = self.batch_bert_data(batch, data, 0)
-        eva_lg_e, eva_lg_b = self.model(batch)
-        loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device) 
-        prob = nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1)
-        total_loss += loss.item()
-        for idx, b_sample in enumerate(b_neg):
-            batch = dict()
-            batch['esim_data'] = (data["esim_data"][0], b_sample)
-            batch = self.batch_bert_data(batch, data, idx + 1)
-            x_1_eva_f_lg, x_2_eva_f_lg = self.model(batch)
-            #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
-            loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
-            total_loss += loss.item()
-            prob = torch.cat((prob, 
-                              nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1),
-                              dim=1)
-        return prob, n_con, total_loss
+        pass
 
 class FineTuningTrainer(Trainer):
 
