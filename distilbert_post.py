@@ -1,4 +1,5 @@
 
+from transformers.utils.dummy_pt_objects import DistilBertForMaskedLM
 from utils.post_train_dataset import BertPostTrainingDataset
 from utils.exp_utils import create_exp_dir, save_checkpoint
 
@@ -8,7 +9,9 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from transformers import BertForPreTraining, BertConfig
+from transformers import DistilBertConfig, DistilBertForMaskedLM
+
+from model.distilbert_post_train_model import *
 
 
 
@@ -53,9 +56,9 @@ def post_train(args):
         pre_train_state = torch.load(os.path.join(args.bert_path, 'pytorch_model.bin'),
                                      map_location='cpu')
 
-    bert_config = BertConfig.from_pretrained(args.bert_path)
-    model = BertForPreTraining.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_train_state)
-    model.resize_token_embeddings(model.config.vocab_size + 2)
+    bert_config = DistilBertConfig.from_pretrained(args.bert_path)
+    model = DistilBertForMaskedLM.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_train_state)
+    model.resize_token_embeddings(bert_config.vocab_size + 2)
     del pre_train_state
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     if optim_state_dict:
@@ -78,10 +81,8 @@ def post_train(args):
             msk_lm_label = data["masked_lm_labels"]
             data["masked_lm_labels"] = torch.where(msk_lm_label == -1, torch.tensor(-100), msk_lm_label)
             loss = model(input_ids=data["input_ids"].to(device),
-                         token_type_ids=data["token_type_ids"].to(device),
-                         attention_mask=data["attention_mask"].to(device),
                          labels=data["masked_lm_labels"].to(device),
-                         next_sentence_label=data["next_sentence_labels"].to(device)).loss
+                         attention_mask=data["attention_mask"].to(device)).loss
             
             loss.backward()
             accu_loss += loss.item()
@@ -117,14 +118,13 @@ def post_train(args):
 
 
 if __name__ == "__main__":
-    home = "/home/cheny539"
     import argparse
     parser = argparse.ArgumentParser(description="Post train")
-    parser.add_argument("--dataset_path", type=str, default=home + "/remote_workspace/dataset/default/",
-                        help='path to dataset')
-    parser.add_argument("--examples_path", type=str, default=home + "/remote_workspace/fusion_esim/data/bert_with_eot/ubuntu_post_training.hdf5",
     parser.add_argument("--proj_name", type=str, default="bert_post_train",
                         help='project name')
+    parser.add_argument("--dataset_path", type=str, default="/remote_workspace/dataset/default/",
+                        help='path to dataset')
+    parser.add_argument("--examples_path", type=str, default="/remote_workspace/fusion_esim/data/bert_with_eot/ubuntu_post_training.hdf5",
                         help='path to dump examples')
     parser.add_argument("--save_dir", type=str, default="../checkpoints",
                         help='checkpoints save dir')

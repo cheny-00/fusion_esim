@@ -2,6 +2,7 @@ test*
 
 */__pycache__
 .gitignore
+.history
 .idea
 data/
 logs/

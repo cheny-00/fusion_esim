@@ -25,8 +25,7 @@ def main(args):
     ##############################################################################
 
     work_dir = os.path.join(os.path.abspath(os.path.join(os.getcwd(), "..")), 'logs')
-    work_dir = os.path.join(work_dir, 'ubuntu_corpus')
-    work_dir = os.path.join(work_dir, time.strftime('%Y%m%d-%H%M%S'))
+    work_dir = os.path.join(work_dir, args.proj_name,time.strftime('%Y%m%d-%H%M%S'))
     logging = create_exp_dir(work_dir,
                              scripts_to_save=['../fusion_run.py', '../utils/train.py'
                                  , '../model/{}.py'.format(args.model.lower())],
@@ -82,6 +81,7 @@ def main(args):
     if args.load_post_trained_bert:
         pre_trianed_state  = torch.load(args.load_post_trained_bert, map_location='cpu')['model_state_dict']
         bert_config.vocab_size += 2
+        print("loaded state dict from: {}".format(args.load_post_trained_bert))
     else:
         pre_trianed_state = torch.load(os.path.join(args.bert_path, 'pytorch_model.bin'),
                                        map_location='cpu')
@@ -182,7 +182,7 @@ def main(args):
                                train_loss=train_loss,
                                distill_loss_fn=args.distill_loss_fn)
 
-    save_dir = os.path.join(args.save_dir, time.strftime('%Y%m%d-%H%M%S'))
+    save_dir = os.path.join(args.save_dir, args.proj_name, time.strftime('%Y%m%d-%H%M%S'))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -330,6 +330,9 @@ if __name__ == "__main__":
                         help="loss function for distillation")
     parser.add_argument('--temperature', type=str, default=1,
                         help="distillation temperature")
+
+    parser.add_argument('--proj_name', type=str, default='ubuntu_corpus',
+                        help='project name')
     args = parser.parse_args()
     # Validate `--fp16` option
     if args.fp16:

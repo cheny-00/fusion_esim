@@ -5,6 +5,7 @@ fi
 
 python3 ../fusion_run.py \
     --batch_size 16 \
+    --proj_name bert_fine_tuning  \
     --model fusion_esim \
     --embed_type 1  \
     --n_layer 6     \
@@ -17,7 +18,7 @@ python3 ../fusion_run.py \
     --eta_min 0.00003 \
     --scheduler inv_sqrt \
     --warmup_step 8100 \
-    --epochs 16 \
+    --epochs 5 \
     --cuda              \
     --model_name bert \
     --dataset_path /remote_workspace/dataset/default \

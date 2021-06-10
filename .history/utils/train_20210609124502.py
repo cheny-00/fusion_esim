@@ -169,7 +169,7 @@ class LSTMTrainer(Trainer):
 
         x_1_logit, x_2_logit = self.model(data)
         loss = self.get_loss(x_1_logit, x_2_logit, label)
-        return loss
+        return loss + distill_loss
 
     def eval_process(self, data, n_con, total_loss):
         b_neg = data["label"][2]
@@ -179,7 +179,7 @@ class LSTMTrainer(Trainer):
         batch["esim_data"] = data["esim_data"]
         batch = self.batch_bert_data(batch, data, 0)
         eva_lg_e, eva_lg_b = self.model(batch)
-        loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device))
+        loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device) 
         prob = nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1)
         total_loss += loss.item()
         for idx, b_sample in enumerate(b_neg):
@@ -190,7 +190,9 @@ class LSTMTrainer(Trainer):
             #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
             loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
             total_loss += loss.item()
-            prob = torch.cat((prob, nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
+            prob = torch.cat((prob, 
+                              nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1),
+                              dim=1)
         return prob, n_con, total_loss
 
 class FineTuningTrainer(Trainer):
