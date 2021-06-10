@@ -51,6 +51,7 @@ class BertPostTrainingDataset(Dataset):
     with h5py.File(self.data_dir, "r") as features_hdf:
       for f_key in self.feature_keys:
         features[f_key] = features_hdf[f_key][index]
+      features_hdf.close()
 
     return features
 
