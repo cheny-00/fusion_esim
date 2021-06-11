@@ -180,7 +180,8 @@ def main(args):
                                plotter=plotter,
                                model_name=model_name,
                                train_loss=train_loss,
-                               distill_loss_fn=args.distill_loss_fn)
+                               distill_loss_fn=args.distill_loss_fn,
+                               temperature=args.temperature)
 
     save_dir = os.path.join(args.save_dir, args.proj_name, time.strftime('%Y%m%d-%H%M%S'))
     if not os.path.exists(save_dir):
