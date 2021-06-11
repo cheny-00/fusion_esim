@@ -169,7 +169,7 @@ class LSTMTrainer(Trainer):
 
         x_1_logit, x_2_logit = self.model(data)
         loss = self.get_loss(x_1_logit, x_2_logit, label)
-        return loss + distill_loss
+        return loss
 
     def eval_process(self, data, n_con, total_loss):
         b_neg = data["label"][2]
@@ -190,9 +190,7 @@ class LSTMTrainer(Trainer):
             #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
             loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
             total_loss += loss.item()
-            prob = torch.cat((prob, 
-                              nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1)),
-                              dim=1)
+            prob = torch.cat((prob, nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
         return prob, n_con, total_loss
 
 class FineTuningTrainer(Trainer):
