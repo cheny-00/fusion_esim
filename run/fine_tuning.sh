@@ -5,6 +5,7 @@ fi
 
 python3 ../fusion_run.py \
     --batch_size 16 \
+    --proj_name bert_fine_tuning  \
     --model fusion_esim \
     --embed_type 1  \
     --n_layer 6     \
@@ -17,12 +18,12 @@ python3 ../fusion_run.py \
     --eta_min 0.00003 \
     --scheduler inv_sqrt \
     --warmup_step 8100 \
-    --epochs 16 \
+    --epochs 5 \
     --cuda              \
     --model_name bert \
-    --dataset_path /remote_workspace/dataset/default \
-    --examples_path /remote_workspace/fusion_esim/data/bert \
-    --bert_path /remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-12_H-768_A-12 \
+    --dataset_path /home/cheny539/remote_workspace/dataset/default \
+    --examples_path /home/cheny539/remote_workspace/fusion_esim/data/bert_with_eot \
+    --bert_path /home/cheny539/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-12_H-768_A-12 \
     --fine_tuning \
-    --load_post_trained_bert \
+    --load_post_trained_bert /home/cheny539/remote_workspace/fusion_esim/checkpoints/bert_post_train/20210608-221516/bert_2.pth.tar \
     $args
