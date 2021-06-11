@@ -38,7 +38,7 @@ def main(args):
         else:
             torch.cuda.manual_seed_all(args.seed)
 
-    plotter = VisdomLinePlotter(env_name="{}".format(args.model))
+    plotter = VisdomLinePlotter(env_name="{}".format(args.proj_name))
     device = torch.device('cuda' if args.cuda else 'cpu')
     torch.cuda.set_device(0)
 
@@ -72,12 +72,14 @@ def main(args):
 
 
     ## Build Bert model
-    if 'bert' in model_name:
+    if 'bert' == model_name:
         bert_config = BertConfig.from_json_file(os.path.join(args.bert_path,
                                                              'config.json'))
         ModelClass = BertModel
-    elif 'distilbert' in model_name:
+    elif 'distilbert' == model_name:
         ModelClass = DistilBertModel
+        bert_config = DistilBertConfig.from_json_file(os.path.join(args.bert_path,
+                                                                   'config.json'))
     if args.load_post_trained_bert:
         pre_trianed_state  = torch.load(args.load_post_trained_bert, map_location='cpu')['model_state_dict']
         bert_config.vocab_size += 2
@@ -184,7 +186,7 @@ def main(args):
                                temperature=args.temperature)
 
     save_dir = os.path.join(args.save_dir, args.proj_name, time.strftime('%Y%m%d-%H%M%S'))
-    if not os.path.exists(save_dir):
+    if not os.path.exists(save_dir) and not args.debug:
         os.makedirs(save_dir)
 
     for epoch in range(ckpt_epoch, args.epochs + 1):
@@ -197,7 +199,7 @@ def main(args):
             # save best
             if not best_score:
                 best_score = eva
-            elif eva[1] > best_score[1] :
+            elif eva[1] > best_score[1] and not args.debug:
                 best_score = eva
                 torch.save({
                     "epoch": epoch,
@@ -208,7 +210,7 @@ def main(args):
                     os.path.join(save_dir, "best.pth.tar"))
             if args.scheduler == 'dev_perf':
                 scheduler.step(eva[1])
-        if not epoch % 10 or args.fine_tuning:
+        if not epoch % 10 or args.fine_tuning and not args.debug:
             save_checkpoint(model,
                             optimizer,
                             save_dir,
