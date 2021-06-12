@@ -3,7 +3,7 @@ if [ "$#" -gt 0 ]
       args="$*"
 fi
 hm=""
-python3 ../fusion_run.py \
+python3 ../bert_eval.py \
     --batch_size 16 \
     --proj_name bert_eval  \
     --cuda              \

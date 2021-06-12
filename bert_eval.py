@@ -1,20 +1,19 @@
 
-from model.fusion_esim import Bert
-from utils.exp_utils import create_exp_dir
 
 import os
-from time import time, strftime
-from tqdm import tqdm
 import torch
-import torch.nn as nn
 import pickle
+from tqdm import tqdm
+import torch.nn as nn
+from time import time, strftime
+from collections import defaultdict
 from torch.utils.data import DataLoader
 from transformers import BertForPreTraining, BertConfig
-from eval.evaluation import eval_samples
+
+from model.fusion_esim import Bert
 from utils.data import UbuntuCorpus
-from collections import defaultdict
-
-
+from eval.evaluation import eval_samples
+from utils.exp_utils import create_exp_dir
 
 DistillationTrainData = defaultdict(list)
 
@@ -24,7 +23,7 @@ def post_train(args):
     # logging
     ##########################################################################################
     work_name = args.proj_name
-    work_dir = os.path.join(os.path.abspath(os.path.join(os.getcwd(), "../..")), '../logs')
+    work_dir = os.path.join(os.path.abspath(os.path.join(os.getcwd(), "..")), 'logs')
     work_dir = os.path.join(work_dir, work_name)
     work_dir = os.path.join(work_dir, strftime('%Y%m%d-%H%M%S'))
     logging = create_exp_dir(work_dir,
