@@ -21,9 +21,6 @@ from rich.progress import (
     TimeRemainingColumn,
     TimeElapsedColumn,
 )
-import spacy
-from gensim.models import Word2Vec
-import multiprocessing
 
 class Vocab(object):
     def __init__(self, special=['__eou__', '__eot__'],
