@@ -1,7 +1,6 @@
 
 
 import os
-import sys
 import torch
 import pickle
 from tqdm import tqdm
@@ -11,7 +10,6 @@ from collections import defaultdict
 from torch.utils.data import DataLoader
 from transformers import BertForPreTraining, BertConfig
 
-sys.path.append("../")
 from model.fusion_esim import Bert
 from utils.data import UbuntuCorpus
 from eval.evaluation import eval_samples
@@ -25,7 +23,7 @@ def post_train(args):
     # logging
     ##########################################################################################
     work_name = args.proj_name
-    work_dir = os.path.join(os.path.abspath(os.path.join(os.getcwd(), "../..")), '../logs')
+    work_dir = os.path.join(os.path.abspath(os.path.join(os.getcwd(), "..")), 'logs')
     work_dir = os.path.join(work_dir, work_name)
     work_dir = os.path.join(work_dir, strftime('%Y%m%d-%H%M%S'))
     logging = create_exp_dir(work_dir,
