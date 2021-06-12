@@ -58,7 +58,7 @@ class Vocab(object):
         elif 'bert' in model_name:
             self.tokenizer = BertTokenizer.from_pretrained(bert_path if bert_path else model_name,
                                                            do_lower_case=lower_case)
-            self.n_bert_token = self.tokenizer.vocab_size
+        self.n_bert_token = self.tokenizer.vocab_size
         if self.do_eot:
             self.tokenizer.add_tokens(["[EOU]", "[EOT]"])
 

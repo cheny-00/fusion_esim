@@ -38,7 +38,7 @@ def main(args):
         else:
             torch.cuda.manual_seed_all(args.seed)
 
-    plotter = VisdomLinePlotter(env_name="{}".format(args.model))
+    plotter = VisdomLinePlotter(env_name="{}".format(args.proj_name))
     device = torch.device('cuda' if args.cuda else 'cpu')
     torch.cuda.set_device(0)
 
@@ -72,12 +72,14 @@ def main(args):
 
 
     ## Build Bert model
-    if 'bert' in model_name:
+    if 'bert' == model_name:
         bert_config = BertConfig.from_json_file(os.path.join(args.bert_path,
                                                              'config.json'))
         ModelClass = BertModel
-    elif 'distilbert' in model_name:
+    elif 'distilbert' == model_name:
         ModelClass = DistilBertModel
+        bert_config = DistilBertConfig.from_json_file(os.path.join(args.bert_path,
+                                                                   'config.json'))
     if args.load_post_trained_bert:
         pre_trianed_state  = torch.load(args.load_post_trained_bert, map_location='cpu')['model_state_dict']
         bert_config.vocab_size += 2
@@ -180,7 +182,8 @@ def main(args):
                                plotter=plotter,
                                model_name=model_name,
                                train_loss=train_loss,
-                               distill_loss_fn=args.distill_loss_fn)
+                               distill_loss_fn=args.distill_loss_fn,
+                               temperature=args.temperature)
 
     save_dir = os.path.join(args.save_dir, args.proj_name, time.strftime('%Y%m%d-%H%M%S'))
     if not os.path.exists(save_dir):

@@ -161,11 +161,15 @@ class Bert(nn.Module):
                                          self.drop,
                                          nn.Linear(bert_dim, 2))
 
-    def forward(self, input_ids, attn_mask, token_ids):
+    def forward(self, input_ids, attn_mask, token_ids, isdistilbert=True):
 
-        output = self.BERT(input_ids=input_ids,
-                           attention_mask=attn_mask,
-                           token_type_ids=token_ids).last_hidden_state
+        if not isdistilbert:
+            output = self.BERT(input_ids=input_ids,
+                               attention_mask=attn_mask,
+                               token_type_ids=token_ids).last_hidden_state
+        else:
+            output = self.BERT(input_ids=input_ids,
+                               attention_mask=attn_mask).last_hidden_state
 
         logit = self._classifier(output[:, 0])
         return logit
