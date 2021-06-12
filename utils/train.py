@@ -8,9 +8,9 @@ from functools import partial
 from utils import get_mask_from_seq_lens
 
 def soft_cross_entropy(predicts, targets, temp):
-        student_likelihood = torch.nn.functional.log_softmax(predicts / temp, dim=-1)
-        targets_prob = torch.nn.functional.softmax(targets / temp, dim=-1)
-        return (- targets_prob * student_likelihood).mean()
+    student_likelihood = torch.nn.functional.log_softmax(predicts / temp, dim=-1)
+    targets_prob = torch.nn.functional.softmax(targets / temp, dim=-1)
+    return (- targets_prob * student_likelihood).mean()
 
 class Trainer():
 

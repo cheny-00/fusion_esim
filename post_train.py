@@ -123,9 +123,9 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_path", type=str, default=home + "/remote_workspace/dataset/default/",
                         help='path to dataset')
     parser.add_argument("--examples_path", type=str, default=home + "/remote_workspace/fusion_esim/data/bert_with_eot/ubuntu_post_training.hdf5",
+                        help='path to dump examples')
     parser.add_argument("--proj_name", type=str, default="bert_post_train",
                         help='project name')
-                        help='path to dump examples')
     parser.add_argument("--save_dir", type=str, default="../checkpoints",
                         help='checkpoints save dir')
     parser.add_argument('--restart_file', type=str, default='',

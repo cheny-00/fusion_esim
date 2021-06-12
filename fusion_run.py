@@ -186,7 +186,7 @@ def main(args):
                                temperature=args.temperature)
 
     save_dir = os.path.join(args.save_dir, args.proj_name, time.strftime('%Y%m%d-%H%M%S'))
-    if not os.path.exists(save_dir):
+    if not os.path.exists(save_dir) and not args.debug:
         os.makedirs(save_dir)
 
     for epoch in range(ckpt_epoch, args.epochs + 1):
@@ -199,7 +199,7 @@ def main(args):
             # save best
             if not best_score:
                 best_score = eva
-            elif eva[1] > best_score[1] :
+            elif eva[1] > best_score[1] and not args.debug:
                 best_score = eva
                 torch.save({
                     "epoch": epoch,
@@ -210,7 +210,7 @@ def main(args):
                     os.path.join(save_dir, "best.pth.tar"))
             if args.scheduler == 'dev_perf':
                 scheduler.step(eva[1])
-        if not epoch % 10 or args.fine_tuning:
+        if not epoch % 10 or args.fine_tuning and not args.debug:
             save_checkpoint(model,
                             optimizer,
                             save_dir,
