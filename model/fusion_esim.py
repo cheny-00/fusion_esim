@@ -159,7 +159,7 @@ class Bert(nn.Module):
                                          self.drop,
                                          nn.Linear(bert_dim, 2))
 
-    def forward(self, input_ids, attn_mask, token_ids, isdistilbert=True):
+    def forward(self, input_ids, attn_mask, token_ids, isdistilbert=False):
 
         if not isdistilbert:
             output = self.BERT(input_ids=input_ids,

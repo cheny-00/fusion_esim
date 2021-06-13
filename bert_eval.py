@@ -6,11 +6,11 @@ import pickle
 from tqdm import tqdm
 import torch.nn as nn
 from time import time, strftime
-from collections import defaultdict
 from torch.utils.data import DataLoader
-from transformers import BertForPreTraining, BertConfig
+from transformers import BertModel, BertConfig
+from collections import defaultdict, OrderedDict
 
-from model.fusion_esim import Bert
+from model.fusion_esim import Bert, FusionEsim
 from utils.data import UbuntuCorpus
 from eval.evaluation import eval_samples
 from utils.exp_utils import create_exp_dir
@@ -42,7 +42,6 @@ def post_train(args):
                                 bert_path=args.bert_path)
     test_iter = DataLoader(test_dataset,
                            batch_size=args.batch_size,
-                           num_workers=8,
                            drop_last=True,
                            shuffle=False)
     ##########################################################################################
@@ -55,13 +54,19 @@ def post_train(args):
         ckpt = torch.load(f)
         pre_train_state = ckpt['model_state_dict']
 
+    tmp = OrderedDict()
+    for key in pre_train_state:
+        if not 'ESIM' in key:
+            tmp[key[5:]] = pre_train_state[key]
 
     bert_config = BertConfig.from_pretrained(args.bert_path)
-    BERT = BertForPreTraining.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_train_state)
-    BERT.resize_token_embeddings(BERT.config.vocab_size + 2)
-    del pre_train_state
+    BERT = BertModel.from_pretrained(args.bert_path, config=bert_config)
+    BERT.resize_token_embeddings(bert_config.vocab_size + 2)
 
     model = Bert(BERT, dropout=0)
+    model.load_state_dict(tmp)
+
+    del pre_train_state, tmp
 
 
     ##########################################################################################
@@ -121,23 +126,26 @@ def eval_process(data,
                  device,
                  model):
     crit = nn.CrossEntropyLoss()
-    b_neg = data[2]
-    if len(data[0][0]) != batch_size: return "continue", n_con, total_loss
+    b_neg = data['esim_data'][2]
+    if len(data['esim_data'][0][0]) != batch_size: return "continue", n_con, total_loss
     n_con += 1
-    eva_lg_b = model(data)
+    eva_lg_b = model(data["anno_seq"][0].to(device),
+                     data["attn_mask"][0].to(device),
+                     data["seg_ids"][0].to(device))
     add_to_dataset(data['esim_data'], eva_lg_b)
     loss = crit(eva_lg_b, torch.tensor([1] * batch_size).to(device))
     prob = nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1)
     total_loss += loss.item()
-    for b_sample in b_neg:
-        data = (data[0], b_sample)
-        x_2_eva_f_lg = model(data, fine_tuning=True)
+    for idx, b_sample in enumerate(b_neg):
+        x_2_eva_f_lg = model(data["anno_seq"][idx + 1].to(device),
+                             data["attn_mask"][idx + 1].to(device),
+                             data["seg_ids"][idx + 1].to(device),
+                             isdistilbert=False)
         #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
         loss = crit(x_2_eva_f_lg, torch.tensor([0] * batch_size).to(device))
         total_loss += loss.item()
         prob = torch.cat((prob, nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
     return prob, n_con, total_loss
-
 
 def get_score(n_eval,
               logging,
@@ -157,6 +165,12 @@ def get_score(n_eval,
     logging('-' * 100)
     return log_str
 
+def batch_bert_data(data, idx):
+    batch = dict()
+    for key in data:
+        if key == 'esim_data': continue
+        batch[key] = data[key][idx].cuda()
+    return batch
 
 def add_to_dataset(data, logits):
     DistillationTrainData['esim_data'].append(data)
@@ -180,8 +194,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--part', type=int, default=10,
                         help='eval part')
-    parser.add_argument('--batch_size', type=int, default=16,
-                        help='batch size')
+    parser.add_argument('--model_name', type=str, default='bert',
+                        help='select a pre trained model')
     parser.add_argument("--bert_path", type=str, default="../data/pre_trained_ckpt/uncased_L-12_H-768_A-12",
                         help='load pretrained bert ckpt files')
     parser.add_argument("--save_dir", type=str, default="../checkpoints",
