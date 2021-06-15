@@ -213,7 +213,7 @@ class UbuntuCorpus(Dataset):
             features["attn_mask"].append(torch.tensor(attn, dtype=torch.long))
             neg_line.append((torch.tensor(anno[max_context_len:], dtype=torch.long), len(neg_seq)))
         features["esim_data"] = ((torch.tensor(anno_seq[:max_context_len], dtype=torch.long), len(context)),
-                                 (torch.tensor(response[max_context_len:], dtype=torch.long), len(response)),
+                                 (torch.tensor(anno_seq[max_context_len:], dtype=torch.long), len(response)),
                                  neg_line)
         return features
     def __getitem__(self, idx):

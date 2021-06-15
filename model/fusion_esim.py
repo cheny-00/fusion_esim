@@ -8,22 +8,15 @@ from transformers import BertModel
 
 class ESIM_like(nn.Module):
     def __init__(self,
-                 n_token,
-                 input_size,
                  hidden_size,
                  dropout,
-                 dropatt,
-                 n_layer,
                  bert_embeddings,
-                 embedding_layer,
                  ismasked=True):
         super(ESIM_like, self).__init__()
         # hyper parameters
         self.input_size = bert_embeddings.embedding_dim
         self.hidden_size = hidden_size
-        self.n_layer = n_layer
         self.dropout = dropout
-        self.dropatt = dropatt
         self.drop = nn.Dropout(dropout)
         self.d_model = self.hidden_size
         self.ismasked = ismasked
@@ -31,7 +24,6 @@ class ESIM_like(nn.Module):
         self.rnn_drop = RNNDropout(p=self.dropout)
         # word emb
         self.bert_embeddings = bert_embeddings
-        self.embedding = embedding_layer
 
         # word level
         self.token_enc = RNN_encoder(nn.LSTM,

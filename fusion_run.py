@@ -3,6 +3,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import pickle
 
 from utils.train import LSTMTrainer, FineTuningTrainer
 from model import *
@@ -47,18 +48,22 @@ def main(args):
     ##############################################################################
     # model_name = 'bert-base-uncased'
     model_name = args.model_name
-    train_dataset = UbuntuCorpus(path=os.path.join(args.dataset_path, 'train.csv'),
-                                 type='train',
-                                 save_path=args.examples_path,
-                                 model_name=model_name,
-                                 special=['__eou__', '__eot__'],
-                                 bert_path=args.bert_path)
+    if not args.distill_step:
+        train_dataset = UbuntuCorpus(path=os.path.join(args.dataset_path, 'train.csv'),
+                                     type='train',
+                                     save_path=args.examples_path,
+                                     model_name=model_name,
+                                     special=['__eou__', '__eot__'],
+                                     bert_path=args.bert_path)
+    else:
+        f = open(os.path.join(args.distill_dataset, 'distillation_dataset.pkl'), 'rb')
+        train_dataset = pickle.load(f)
     eval_dataset = UbuntuCorpus(path=os.path.join(args.dataset_path, 'valid.csv'),
                                 type='valid',
                                 save_path=args.examples_path,
                                 model_name=model_name,
                                 special=['__eou__', '__eot__'],
-                                worddict=train_dataset.Vocab.worddict,
+                                worddict=None if args.distill_step else train_dataset.Vocab.worddict,
                                 bert_path=args.bert_path)
     train_iter = DataLoader(train_dataset,
                             batch_size=args.batch_size,
@@ -90,10 +95,7 @@ def main(args):
     bert = ModelClass.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_trianed_state)
     del pre_trianed_state
 
-    ## build word embedding
-    _word_embedding = bert.embeddings.word_embeddings
-    _word_embedding = train_dataset.Vocab.build_embed_layer(embedding_weight=_word_embedding.weight)
-    embedding_layer = nn.Embedding.from_pretrained(_word_embedding, freeze=False, padding_idx=0)
+
     ###############################################################################
     # Build the model
     ###############################################################################
@@ -106,8 +108,11 @@ def main(args):
                                        hidden_size=args.d_model,
                                        dropout=args.dropout,
                                        dropatt=args.dropatt,
-                                       embedding_layer=embedding_layer,
                                        n_layer=args.n_layer)
+    elif args.model == 'esim':
+        model = fusion_esim.ESIM_like(hidden_size=args.d_model,
+                                      dropout=args.dropout,
+                                      bert_embeddings=bert.embeddings.word_embeddings,)
 
     if args.optim.lower() == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.mom)
@@ -333,7 +338,10 @@ if __name__ == "__main__":
                         help="loss function for distillation")
     parser.add_argument('--temperature', type=str, default=1,
                         help="distillation temperature")
-
+    parser.add_argument('--distill_step', action='store_true',
+                        help='run in pseudo-fp16 mode (fp16 storage fp32 math).')
+    parser.add_argument('--distill_dataset', type=str, default='',
+                        help='distillation dataset')
     parser.add_argument('--proj_name', type=str, default='ubuntu_corpus',
                         help='project name')
     args = parser.parse_args()
