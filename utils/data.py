@@ -7,12 +7,7 @@ from functools import partial, reduce
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 from collections import Counter
-from transformers import (
-    BertModel,
-    BertTokenizer,
-    DistilBertTokenizerFast,
-    DistilBertModel,
-)
+
 from rich.progress import (
     BarColumn,
     Progress,
@@ -22,6 +17,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 import spacy
+from spacy.attrs import ORTH
 from gensim.models import Word2Vec
 import multiprocessing
 
@@ -45,26 +41,14 @@ class Vocab(object):
         self.offset = 0
 
         self.lower_case = lower_case
-        self.model_name = model_name
-        if 'distilbert' in model_name:
-            self.tokenizer = DistilBertTokenizerFast.from_pretrained(bert_path if bert_path else model_name,
-                                                                     do_lower_case=lower_case)
-        elif 'bert' in model_name:
-            self.tokenizer = BertTokenizer.from_pretrained(bert_path if bert_path else model_name,
-                                                           do_lower_case=lower_case)
-            self.n_bert_token = self.tokenizer.vocab_size
 
         self.w2v_tokenizer = spacy.load("en_core_web_sm")
-
+        spacy_specials_trans = [[{ORTH:"__eou__"}], [{ORTH:"__eot__"}]]
+        for s, n in zip(self.special, spacy_specials_trans):
+            self.w2v_tokenizer.tokenizer.add_special_case(s, n)
     def pre_tokenize(self, line):
-        for token in self.special:
-            line = line.replace(token, "")
         return line
-    def tokenize(self, line): #TODO remove special tokens, split turn
 
-        encoded_line = self.tokenizer.encode(self.pre_tokenize(line), add_special_tokens=True, truncation=True)
-        # TODO add_special_tokens & truncation
-        return encoded_line
 
     def w2v_tokenize(self, line):
         text = [tok.text for tok in self.w2v_tokenizer.tokenizer(self.pre_tokenize(line)) if tok.text != '']
@@ -72,8 +56,6 @@ class Vocab(object):
 
     def read_csv_file(self, path, train, func=None, w2v_f = None):
         assert os.path.exists(path)
-        if not func:
-            func = self.tokenize
         if not w2v_f:
             w2v_f = self.w2v_tokenize
         type = 'train' if train else 'valid or test'
@@ -89,9 +71,8 @@ class Vocab(object):
             neg_samples = header[2:]
             neg_data = [f[neg].tolist() for neg in neg_samples]
             data = (context, response, neg_data)
-        b_data = self.iter_data(data, task, train, func)
         w2v_data = self.iter_data(data, task, train, w2v_f)
-        return (w2v_data, b_data)
+        return w2v_data
 
 
     def get_word(self, c, r, l):
@@ -106,7 +87,7 @@ class Vocab(object):
 
         counts = Counter(words)
         num_words = len(counts)
-        self.offset = 0
+        self.offset = 2
 
         self.worddict["[PAD]"] = 0
         self.worddict["[UNK]"] = 1
@@ -116,7 +97,7 @@ class Vocab(object):
         #     offset += 1
         n_tokens = len(self.worddict)
         for i, word in enumerate(counts.most_common(num_words)):
-            if word[0] not in self.worddict:
+            if word[0] not in self.worddict and word[1] >= 5:
                 self.worddict[word[0]] = n_tokens
                 n_tokens += 1
 
@@ -261,7 +242,7 @@ class UbuntuCorpus(Dataset):
         wordict_path = os.path.join(save_path, 'worddict')
 
         if not self.data:
-            w2v_data, b_data = self.Vocab.read_csv_file(path=path, train=(type=='train')) # (w2v, bert)
+            w2v_data = self.Vocab.read_csv_file(path=path, train=(type=='train'))
             # word2vec
             if os.path.exists(wordict_path):
                 self.Vocab.worddict = self.load(wordict_path)
@@ -272,32 +253,25 @@ class UbuntuCorpus(Dataset):
             assert self.Vocab.worddict, 'make suere worddict exist'
             w2v_data = self.Vocab.file_to_indices(data=w2v_data,
                                                   train=type=='train')
-            self.data = (w2v_data, b_data)
+            self.data = w2v_data
             self.dump(self.data, s_path)
         if type == 'train':
              # if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
-            emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.txt'])
-            bert_emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
+            emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.model'])
+
             if not self.Vocab.worddict and os.path.exists(wordict_path): self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
-            elif not os.path.exists(wordict_path): self.Vocab.build_worddict(*self.data[0])
+            elif not os.path.exists(wordict_path): self.Vocab.build_worddict(*self.data)
+
             if not os.path.exists(emb_path):
-                self.embeddings = self.Vocab.train_word2vec(self.data[0])
-                self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
-            if not os.path.exists(bert_emb_path):
-                self.embeddings = self.Vocab.build_embed_layer(emb_path)
-                np.save(bert_emb_path, self.embeddings)
+                self.embeddings = self.Vocab.train_word2vec(self.data)
+                self.embeddings.save(emb_path)
             else:
-                self.embeddings = np.load(bert_emb_path)
-            # if not os.path.exists(emb_path):
-            #     self.embeddings = self.Vocab.train_word2vec(self.data[0])
-            #     self.embeddings.save(emb_path)
-            # else:
-            #     self.embeddings = Word2Vec.load(emb_path) # offset = 4
+                self.embeddings = Word2Vec.load(emb_path) # offset = 2
 
 
 
     def __len__(self):
-        return len(self.data[0][0])
+        return len(self.data[0])
     @staticmethod
     def get_item(idx, data, train):
         if train:
@@ -376,12 +350,12 @@ if __name__ == '__main__':
 
     path = '/remote_workspace/dataset/default/valid.csv'
     train_path = '/remote_workspace/dataset/default/train.csv'
-    save_path = '/remote_workspace/fusion_esim/data/examples'
+    save_path = '/remote_workspace/fusion_esim/data/w2v'
     model_name = 'bert'
     bert_path = '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8'
-    val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
-    # train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
-    val_dataloader = DataLoader(val_dataset, batch_size=5, collate_fn=ub_corpus_test_collate_fn)
+    # val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    # val_dataloader = DataLoader(val_dataset, batch_size=5, collate_fn=ub_corpus_test_collate_fn)
     # train_dataloader = DataLoader(train_dataset, batch_size=16, collate_fn=ub_corpus_train_collate_fn)
     # while 1:
     # #
