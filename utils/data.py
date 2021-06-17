@@ -148,6 +148,7 @@ class Vocab(object):
 
 
 
+
 class UbuntuCorpus(Dataset):
 
     def __init__(self, path, type, save_path, **kwargs):
@@ -190,12 +191,11 @@ class UbuntuCorpus(Dataset):
             label = data[2][idx]
             features = dict()
             features["esim_data"] = ((torch.tensor(anno_seq[:max_context_len], dtype=torch.long), len(context)),
-                                     (torch.tensor(anno_seq[max_context_len:], dtype=torch.long), len(response)),
-                                     label)
+                                     (torch.tensor(anno_seq[max_context_len:], dtype=torch.long), len(response)))
             features["anno_seq"] = torch.tensor(anno_seq, dtype=torch.long)
             features["seg_ids"] = torch.tensor(seg_ids, dtype=torch.long)
             features["attn_mask"] = torch.tensor(attn_mask, dtype=torch.long)
-            features["label"] = label
+            features["label"] = torch.tensor(label, dtype=torch.long)
             return features
 
         n_sample = len(data[2])

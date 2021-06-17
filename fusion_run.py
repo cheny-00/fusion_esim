@@ -17,6 +17,8 @@ from transformers import (
     BertConfig,
     DistilBertConfig,
 )
+
+from utils.distillation_dataset import DistillationDataset
 from transformers.optimization import get_linear_schedule_with_warmup
 
 def main(args):
@@ -29,7 +31,7 @@ def main(args):
     work_dir = os.path.join(work_dir, args.proj_name,time.strftime('%Y%m%d-%H%M%S'))
     logging = create_exp_dir(work_dir,
                              scripts_to_save=['../fusion_run.py', '../utils/train.py'
-                                 , '../model/{}.py'.format(args.model.lower())],
+                                 , '../model/fusion_esim.py'],
                              debug=args.debug)
 
     torch.manual_seed(args.seed)
@@ -56,8 +58,7 @@ def main(args):
                                      special=['__eou__', '__eot__'],
                                      bert_path=args.bert_path)
     else:
-        f = open(os.path.join(args.distill_dataset, 'distillation_dataset.pkl'), 'rb')
-        train_dataset = pickle.load(f)
+        train_dataset = DistillationDataset(os.path.join(args.distill_dataset, 'distillation_dataset.pkl'))
     eval_dataset = UbuntuCorpus(path=os.path.join(args.dataset_path, 'valid.csv'),
                                 type='valid',
                                 save_path=args.examples_path,
@@ -215,7 +216,7 @@ def main(args):
                     os.path.join(save_dir, "best.pth.tar"))
             if args.scheduler == 'dev_perf':
                 scheduler.step(eva[1])
-        if not epoch % 10 or args.fine_tuning and not args.debug:
+
             save_checkpoint(model,
                             optimizer,
                             save_dir,
