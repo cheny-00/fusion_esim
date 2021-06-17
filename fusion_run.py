@@ -96,7 +96,19 @@ def main(args):
     bert = ModelClass.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_trianed_state)
     del pre_trianed_state
 
-
+    # get embedding layer
+    if args.model == 'esim':
+        from gensim.models import Word2Vec
+        w2v_path = '/remote_workspace/fusion_esim/data/w2v/embeddings/ubuntu_corpus.model'
+        offset = 2
+        _word_embedding = Word2Vec.load(w2v_path)
+        _word_embedding = torch.FloatTensor(_word_embedding.wv.vectors)
+        n_token, d_emb = _word_embedding.shape
+        randn_embedding = torch.randn(n_token + offset, args.d_embed) # uniform distribution
+        randn_embedding[offset:n_token+offset, :] = _word_embedding
+        embeddings_layer = nn.Embedding.from_pretrained(randn_embedding, freeze=False)
+    else:
+        embeddings_layer = bert.embeddings.word_embeddings
     ###############################################################################
     # Build the model
     ###############################################################################
@@ -113,7 +125,7 @@ def main(args):
     elif args.model == 'esim':
         model = fusion_esim.ESIM_like(hidden_size=args.d_model,
                                       dropout=args.dropout,
-                                      bert_embeddings=bert.embeddings.word_embeddings,)
+                                      embeddings=embeddings_layer,)
 
     if args.optim.lower() == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.mom)
