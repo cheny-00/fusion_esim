@@ -289,9 +289,8 @@ class UbuntuCorpus(Dataset):
     def __getitem__(self, idx):
         # input : context, response, label/ neg_samples
         # output: (context, context_len), (response, response_len), ...
-        w2v_data, b_data = self.data[0], self.data[1]
-        return (self.get_item(idx, w2v_data, self.type=='train'),
-                self.get_item(idx, b_data, self.type=='train'))
+        w2v_data = self.data
+        return self.get_item(idx, w2v_data, self.type=='train')
 
     def dump(self, data, path):
         with open(path, 'wb') as f:
@@ -353,8 +352,9 @@ if __name__ == '__main__':
     save_path = '/remote_workspace/fusion_esim/data/w2v'
     model_name = 'bert'
     bert_path = '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8'
-    # val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
     train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
+    test_dataset = UbuntuCorpus(path=path, type='test', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
     # val_dataloader = DataLoader(val_dataset, batch_size=5, collate_fn=ub_corpus_test_collate_fn)
     # train_dataloader = DataLoader(train_dataset, batch_size=16, collate_fn=ub_corpus_train_collate_fn)
     # while 1:
