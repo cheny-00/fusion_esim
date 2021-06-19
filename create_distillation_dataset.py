@@ -25,7 +25,6 @@ DistillationTrainData['r_len'] = np.empty((0, 1), int)
 DistillationTrainData['label'] = np.empty((0, 1), int)
 DistillationTrainData['t_logits'] = np.empty((0, 2), int)
 
-
 def post_train(args):
     ##########################################################################################
     # logging
@@ -50,7 +49,6 @@ def post_train(args):
                                  bert_path=args.bert_path)
     train_iter = DataLoader(train_dataset,
                             batch_size=args.batch_size,
-                            drop_last=True,
                             shuffle=False)
     ##########################################################################################
     #   prepare train
@@ -122,7 +120,7 @@ def eval_process(data,
     logits = model(data["anno_seq"].to(device),
                    data["attn_mask"].to(device),
                    data["seg_ids"].to(device))
-    add_to_dataset(data['esim_data'], logits)
+    add_to_dataset(data['esim_data'], label, logits)
     loss = crit(logits, label.to(device))
     return loss
 
@@ -134,12 +132,12 @@ def batch_bert_data(data, idx):
         batch[key] = data[key][idx].cuda()
     return batch
 
-def add_to_dataset(data, logits):
+def add_to_dataset(data, label, logits):
     DistillationTrainData['context'] = np.append(DistillationTrainData['context'], data[0][0].cpu().numpy(), axis=0)
     DistillationTrainData['c_len'] = np.append(DistillationTrainData['c_len'], data[0][1].cpu().numpy().reshape(data[0][1].shape[0], 1), axis=0)
     DistillationTrainData['response'] = np.append(DistillationTrainData['response'],data[1][0].cpu().numpy(), axis=0)
     DistillationTrainData['r_len'] = np.append(DistillationTrainData['r_len'],data[1][1].cpu().numpy().reshape(data[1][1].shape[0], 1), axis=0)
-    DistillationTrainData['label'] = np.append(DistillationTrainData['label'], np.array(data[2].cpu()).reshape(data[2].shape[0], 1), axis=0)
+    DistillationTrainData['label'] = np.append(DistillationTrainData['label'], np.array(label.cpu()).reshape(label.shape[0], 1), axis=0)
     DistillationTrainData['t_logits'] = np.append(DistillationTrainData['t_logits'], np.array(logits.cpu()), axis=0)
 
 if __name__ == "__main__":

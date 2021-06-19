@@ -3,7 +3,7 @@ if [ "$#" -gt 0 ]
       args="$*"
 fi
 hm=""
-python3 ../fusion_run.py \
+python3 ../esim_run.py \
     --batch_size 64 \
     --proj_name train_esim  \
     --model esim \
