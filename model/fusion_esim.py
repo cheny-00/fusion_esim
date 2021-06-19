@@ -10,11 +10,11 @@ class ESIM_like(nn.Module):
     def __init__(self,
                  hidden_size,
                  dropout,
-                 embeddings,
+                 bert_embeddings,
                  ismasked=True):
         super(ESIM_like, self).__init__()
         # hyper parameters
-        self.input_size = embeddings.embedding_dim
+        self.input_size = bert_embeddings.embedding_dim
         self.hidden_size = hidden_size
         self.dropout = dropout
         self.drop = nn.Dropout(dropout)
@@ -23,7 +23,7 @@ class ESIM_like(nn.Module):
 
         self.rnn_drop = RNNDropout(p=self.dropout)
         # word emb
-        self.embeddings = embeddings
+        self.bert_embeddings = bert_embeddings
 
         # word level
         self.token_enc = RNN_encoder(nn.LSTM,

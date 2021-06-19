@@ -147,7 +147,7 @@ class Vocab(object):
 
 
 
-
+import pickle
 
 class UbuntuCorpus(Dataset):
 
@@ -159,11 +159,16 @@ class UbuntuCorpus(Dataset):
         self.max_context_len = 280
         self.max_response_len = 40
         self.Vocab = Vocab(**kwargs)
+        hm = ""
 
 
         assert os.path.exists(save_path)
         s_path = os.path.join(save_path, type)
         self.data = self.load_data(s_path)
+        if type == 'train':
+            self.e_data = self.pickle_load_data(hm + '/remote_workspace/fusion_esim/data/w2v/esim_data.pkl')
+        else:
+            self.e_data = self.pickle_load_data(hm + '/remote_workspace/fusion_esim/data/w2v/esim_{}_data.pkl'.format(type))
         wordict_path = os.path.join(save_path, 'worddict')
 
         if not self.data:
@@ -178,20 +183,24 @@ class UbuntuCorpus(Dataset):
             assert self.Vocab.worddict, 'make sure worddict exist'
             self.dump(self.data, s_path)
 
-
+    @staticmethod
+    def pickle_load_data(path):
+        with open(path, 'rb') as f:
+            data = pickle.load(f)
+        return data
 
     def __len__(self):
         return len(self.data[0])
 
     @staticmethod
-    def get_item(idx, data, train, max_context_len, max_response_len):
+    def get_item(idx, data, e_data, train, max_context_len, max_response_len):
         context, response = data[0][idx], data[1][idx]
         anno_seq, seg_ids, attn_mask = bert_input_data(context, response, max_context_len, max_response_len)
         if train:
             label = data[2][idx]
             features = dict()
-            features["esim_data"] = ((torch.tensor(anno_seq[:max_context_len], dtype=torch.long), len(context)),
-                                     (torch.tensor(anno_seq[max_context_len:], dtype=torch.long), len(response)))
+            features["esim_data"] = ((torch.tensor(e_data['context'][idx], dtype=torch.long), e_data['c_len'][idx]),
+                                     (torch.tensor(e_data['response'][idx], dtype=torch.long), e_data['r_len'][idx]))
             features["anno_seq"] = torch.tensor(anno_seq, dtype=torch.long)
             features["seg_ids"] = torch.tensor(seg_ids, dtype=torch.long)
             features["attn_mask"] = torch.tensor(attn_mask, dtype=torch.long)
@@ -212,14 +221,14 @@ class UbuntuCorpus(Dataset):
             features["seg_ids"].append(torch.tensor(seg, dtype=torch.long))
             features["attn_mask"].append(torch.tensor(attn, dtype=torch.long))
             neg_line.append((torch.tensor(anno[max_context_len:], dtype=torch.long), len(neg_seq)))
-        features["esim_data"] = ((torch.tensor(anno_seq[:max_context_len], dtype=torch.long), len(context)),
-                                 (torch.tensor(anno_seq[max_context_len:], dtype=torch.long), len(response)),
-                                 neg_line)
+        features["esim_data"] = ((torch.tensor(e_data['context'], dtype=torch.long), e_data['c_len']),
+                                 (torch.tensor(e_data['response'], dtype=torch.long),e_data['r_len']),
+                                 (torch.tensor(e_data['neg'], dtype=torch.long), e_data['neg_len']))
         return features
     def __getitem__(self, idx):
         # input : context, response, label/ neg_samples
         # output: (context, context_len), (response, response_len), ...
-        return self.get_item(idx, self.data, self.type=='train', self.max_context_len, self.max_response_len)
+        return self.get_item(idx, self.data, self.e_data, self.type=='train', self.max_context_len, self.max_response_len)
 
     def dump(self, data, path):
         with open(path, 'wb') as f:

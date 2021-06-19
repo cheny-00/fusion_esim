@@ -26,7 +26,7 @@ python3 ../fusion_run.py \
     --distill_dataset /remote_workspace/fusion_esim/checkpoints/create_distillation_dataset/20210615-104832 \
     --bert_path $hm/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-12_H-768_A-12 \
     --distill_step \
-    --load_post_trained_bert $hm/remote_workspace/fusion_esim/checkpoints/bert_post_train/20210608-221516/bert_2.pth.tar \
     --temperature 1 \
     --eval_interval 3 \
     $args
+   #--load_post_trained_bert $hm/remote_workspace/fusion_esim/checkpoints/bert_post_train/20210608-221516/bert_2.pth.tar \

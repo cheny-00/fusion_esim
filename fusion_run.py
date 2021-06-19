@@ -116,16 +116,12 @@ def main(args):
     if args.model == 'fusion_esim':
         model = fusion_esim.FusionEsim(BERT=bert,
                                        n_bert_token=train_dataset.Vocab.n_bert_token,
-                                       n_token=-1,
-                                       input_size=args.d_embed,
                                        hidden_size=args.d_model,
-                                       dropout=args.dropout,
-                                       dropatt=args.dropatt,
-                                       n_layer=args.n_layer)
+                                       dropout=args.dropout,)
     elif args.model == 'esim':
         model = fusion_esim.ESIM_like(hidden_size=args.d_model,
                                       dropout=args.dropout,
-                                      embeddings=embeddings_layer,)
+                                      bert_embeddings=embeddings_layer,)
 
     if args.optim.lower() == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.mom)
