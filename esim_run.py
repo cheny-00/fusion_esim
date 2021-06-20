@@ -59,7 +59,6 @@ def main(args):
                                      bert_path=args.bert_path)
     else:
         train_dataset = DistillationDataset(os.path.join(args.distill_dataset, 'distillation_dataset.pkl'))
-        train_dataset = DistillationDataset(os.path.join(args.distill_dataset, 'distillation_dataset.pkl'))
     eval_dataset = UbuntuCorpus(path=os.path.join(args.dataset_path, 'valid.csv'),
                                 type='valid',
                                 save_path=args.examples_path,
