@@ -4,7 +4,7 @@ if [ "$#" -gt 0 ]
 fi
 hm=""
 python3 ../fusion_run.py \
-    --batch_size 32 \
+    --batch_size 16 \
     --proj_name distilbert_fine_tuning  \
     --model fusion_esim \
     --embed_type 1  \

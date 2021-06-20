@@ -91,7 +91,7 @@ class Trainer():
                 loss.backward()
                 nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
             self.optimizer.step()
-            if 'scheduler' and 'warmup_step' in kwargs:
+            if 'scheduler' and 'warmup_step' in kwargs and kwargs['warmup_step']:
                 scheduler = kwargs['scheduler']
                 warmup_step = kwargs['warmup_step']
                 # if self.train_step < warmup_step:
@@ -132,7 +132,7 @@ class Trainer():
                                                                          (time.time() - eval_start_time),
                                                                          total_loss / (n_con * 10),
                                                                          eva[0], eva[1], eva[2], eva[3], eva[4], eva[5])
-        self.logging(log_str, print_=False)
+        self.logging(log_str)
         self.logging('-' * 100, print_=False)
         tqdm_eval_iter.set_description(log_str)
 
@@ -154,43 +154,41 @@ class Trainer():
 class LSTMTrainer(Trainer):
 
     def get_loss(self, predicts, targets, label):
+        alpha = 0.5
         distill_loss = self.distill_loss_fn(predicts, targets)
+        if len(label.size()) > 1: label = label.view(-1)
         loss = self.crit(predicts, label)
-        return distill_loss + loss
+        return (alpha * distill_loss) + ((1- alpha) * loss)
 
     def train_process(self, data):
 
         label = data["label"]
         if len(label) != self.batch_size: return "continue"
-        elif not set(list(label)) == set([0, 1]): return "continue"
+        # elif not set(label.tolist()) == set([0, 1]): return "continue"
         self.optimizer.zero_grad()
         self.train_step += 1
-        label = torch.tensor(label, dtype=torch.long)
-
-        x_1_logit, x_2_logit = self.model(data)
-        loss = self.get_loss(x_1_logit, x_2_logit, label)
+        x_logits = self.model(data['esim_data'])
+        y_logits = data['t_logits'].cuda()
+        loss = self.get_loss(x_logits, y_logits, label.cuda())
         return loss
 
     def eval_process(self, data, n_con, total_loss):
-        b_neg = data["label"][2]
+        b_neg, context = data["esim_data"][2], data['esim_data'][0]
         if len(data["esim_data"][0][0]) != self.batch_size: return "continue"
         n_con += 1
-        batch = dict()
-        batch["esim_data"] = data["esim_data"]
-        batch = self.batch_bert_data(batch, data, 0)
-        eva_lg_e, eva_lg_b = self.model(batch)
-        loss = self.crit(eva_lg_e, torch.tensor([1] * self.batch_size).to(self.device))
-        prob = nn.functional.softmax(eva_lg_e, dim=1)[:, 1].unsqueeze(1)
+        eva_lg= self.model(data['esim_data'])
+        loss = self.crit(eva_lg, torch.tensor([1] * self.batch_size).to(self.device))
+        prob = nn.functional.softmax(eva_lg, dim=1)[:, 1].unsqueeze(1)
         total_loss += loss.item()
-        for idx, b_sample in enumerate(b_neg):
-            batch = dict()
-            batch['esim_data'] = (data["esim_data"][0], b_sample)
-            batch = self.batch_bert_data(batch, data, idx + 1)
-            x_1_eva_f_lg, x_2_eva_f_lg = self.model(batch)
+        neg_r, neg_l = b_neg[0].reshape(9, self.batch_size, 40), b_neg[1].reshape(9, self.batch_size, 1)
+        for  b_res, b_len in zip(neg_r, neg_l):
+            b_sample = (b_res, b_len)
+            neg_data = (context, b_sample)
+            eva_f_lg = self.model(neg_data)
             #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
-            loss = self.crit(x_1_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
+            loss = self.crit(eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
             total_loss += loss.item()
-            prob = torch.cat((prob, nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
+            prob = torch.cat((prob, nn.functional.softmax(eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
         return prob, n_con, total_loss
 
 class FineTuningTrainer(Trainer):
@@ -198,10 +196,10 @@ class FineTuningTrainer(Trainer):
     def train_process(self, data):
         label = data["label"].tolist()
         if len(label) != self.batch_size: return "continue"
-        elif not set(list(label)) == set([0, 1]): return "continue"
+        elif not set(label.tolist()) == set([0, 1]): return "continue"
         self.optimizer.zero_grad()
         self.train_step += 1
-        label = torch.tensor(label, dtype=torch.long)
+
         x_1_logit, x_2_logit = self.model(data, fine_tuning=True)
         loss = self.crit(x_2_logit, label.to(self.device))
         return loss

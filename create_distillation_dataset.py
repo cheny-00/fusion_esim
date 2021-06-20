@@ -3,6 +3,7 @@
 import os
 import torch
 import pickle
+import numpy as np
 from tqdm import tqdm
 import torch.nn as nn
 from time import time, strftime
@@ -15,8 +16,14 @@ from utils.data import UbuntuCorpus
 from eval.evaluation import eval_samples
 from utils.exp_utils import create_exp_dir
 
-DistillationTrainData = defaultdict(list)
+DistillationTrainData = dict()
 
+DistillationTrainData['context'] = np.empty((0, 280), int)
+DistillationTrainData['c_len'] = np.empty((0, 1), int)
+DistillationTrainData['response'] = np.empty((0, 40), int)
+DistillationTrainData['r_len'] = np.empty((0, 1), int)
+DistillationTrainData['label'] = np.empty((0, 1), int)
+DistillationTrainData['t_logits'] = np.empty((0, 2), int)
 
 def post_train(args):
     ##########################################################################################
@@ -34,16 +41,15 @@ def post_train(args):
     ##########################################################################################
     ##   load post-train dataset
     ##########################################################################################
-    test_dataset = UbuntuCorpus(path=os.path.join(args.dataset_path, 'test.csv'),
-                                type='test',
-                                save_path=args.examples_path,
-                                model_name=args.model_name,
-                                special=['__eou__', '__eot__'],
-                                bert_path=args.bert_path)
-    test_iter = DataLoader(test_dataset,
-                           batch_size=args.batch_size,
-                           drop_last=True,
-                           shuffle=False)
+    train_dataset = UbuntuCorpus(path=os.path.join(args.dataset_path, 'train.csv'),
+                                 type='train',
+                                 save_path=args.examples_path,
+                                 model_name=args.model_name,
+                                 special=['__eou__', '__eot__'],
+                                 bert_path=args.bert_path)
+    train_iter = DataLoader(train_dataset,
+                            batch_size=args.batch_size,
+                            shuffle=False)
     ##########################################################################################
     #   prepare train
     ##########################################################################################
@@ -77,94 +83,47 @@ def post_train(args):
     model.to(device)
 
     model.eval()
-    total_loss, n_con, eval_start_time = 0, 0, time()
-    prob_set = []
+    total_loss, eval_start_time = 0, time()
+    tqdm_train_iter = tqdm(train_iter)
 
-    tqdm_test_iter = tqdm(test_iter)
-
-    total_steps = len(test_iter)
-    curr = eval_interval = total_steps // args.part
-    prev = 0
 
     with torch.no_grad():
-        for i, data in enumerate(tqdm_test_iter):
-            prob, n_con, total_loss = eval_process(data,
-                                                   n_con,
-                                                   total_loss,
-                                                   args.batch_size,
-                                                   device,
-                                                   model)
-            if type(prob) is str: continue
-            prob_set.append(prob.tolist())
-            if  n_con + 1 == curr:
-                log_str = get_score('Eval Step:{}'.format(curr // eval_interval),
-                                    logging,
-                                    prob_set[prev:curr],
-                                    eval_start_time,
-                                    total_loss/ (n_con * 10))
-                tqdm_test_iter.set_description(log_str)
-                eval_start_time = time()
-                prev, curr = n_con, curr + eval_interval
-
-
-    log_str = get_score('Final Eval',
-                        logging,
-                        prob_set,
-                        eval_start_time,
-                        total_loss/ (n_con * 10),)
-
-    tqdm_test_iter.set_description(log_str)
+        for i, data in enumerate(tqdm_train_iter):
+            loss = eval_process(data,
+                                args.batch_size,
+                                device,
+                                model)
+            if type(loss) is str: continue
+            total_loss += loss
+            if (i + 1) % 200 == 0:
+                log_str = '| {:>6d} batches | ms/batch {:5.2f} | loss {} |'.format(i + 1, time() - eval_start_time, total_loss / 200)
+                eval_start_time, total_loss = time(), 0
+                tqdm_train_iter.set_description(log_str)
+                logging(log_str, print_=False)
     if not args.debug:
         if not os.path.exists(save_dir): os.makedirs(save_dir)
         with open(os.path.join(save_dir,'distillation_dataset.pkl'), 'wb') as f:
             pickle.dump(DistillationTrainData, f)
             print("saved distillation_dataset.pkl at {}".format(save_dir))
 
+
+crit = nn.CrossEntropyLoss()
 def eval_process(data,
-                 n_con,
-                 total_loss,
                  batch_size,
                  device,
                  model):
-    crit = nn.CrossEntropyLoss()
-    b_neg = data['esim_data'][2]
-    if len(data['esim_data'][0][0]) != batch_size: return "continue", n_con, total_loss
-    n_con += 1
-    eva_lg_b = model(data["anno_seq"][0].to(device),
-                     data["attn_mask"][0].to(device),
-                     data["seg_ids"][0].to(device))
-    add_to_dataset(data['esim_data'], eva_lg_b)
-    loss = crit(eva_lg_b, torch.tensor([1] * batch_size).to(device))
-    prob = nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1)
-    total_loss += loss.item()
-    for idx, b_sample in enumerate(b_neg):
-        x_2_eva_f_lg = model(data["anno_seq"][idx + 1].to(device),
-                             data["attn_mask"][idx + 1].to(device),
-                             data["seg_ids"][idx + 1].to(device),
-                             isdistilbert=False)
-        #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
-        loss = crit(x_2_eva_f_lg, torch.tensor([0] * batch_size).to(device))
-        total_loss += loss.item()
-        prob = torch.cat((prob, nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
-    return prob, n_con, total_loss
 
-def get_score(n_eval,
-              logging,
-              prob_set,
-              eval_start_time,
-              curr_loss):
+    label = data["label"].tolist()
+    if len(label) != batch_size: return "continue"
+    elif not set(list(label)) == set([0, 1]): return "continue"
+    label = torch.tensor(label, dtype=torch.long)
+    logits = model(data["anno_seq"].to(device),
+                   data["attn_mask"].to(device),
+                   data["seg_ids"].to(device))
+    add_to_dataset(data['esim_data'], label, logits)
+    loss = crit(logits, label.to(device))
+    return loss
 
-    eva = eval_samples(prob_set)
-    logging('-' * 100, print_=False)
-    log_str = '|{}| time: {:5.2f}s ' \
-              '| valid loss {:5.4f} | R_1@2 {:5.4f} | R_1@10 {:5.4f} | R_2@10 {:5.4f} |'\
-              ' R_5@10 {:5.4f} | MAP {:5.4f} | MRR {:5.4f}  '.format(n_eval,
-                                                                     (time() - eval_start_time),
-                                                                     curr_loss,
-                                                                     eva[0], eva[1], eva[2], eva[3], eva[4], eva[5])
-    logging(log_str, print_=False)
-    logging('-' * 100, print_=False)
-    return log_str
 
 def batch_bert_data(data, idx):
     batch = dict()
@@ -173,9 +132,13 @@ def batch_bert_data(data, idx):
         batch[key] = data[key][idx].cuda()
     return batch
 
-def add_to_dataset(data, logits):
-    DistillationTrainData['esim_data'].append(data)
-    DistillationTrainData['t_logits'].append(logits)
+def add_to_dataset(data, label, logits):
+    DistillationTrainData['context'] = np.append(DistillationTrainData['context'], data[0][0].cpu().numpy(), axis=0)
+    DistillationTrainData['c_len'] = np.append(DistillationTrainData['c_len'], data[0][1].cpu().numpy().reshape(data[0][1].shape[0], 1), axis=0)
+    DistillationTrainData['response'] = np.append(DistillationTrainData['response'],data[1][0].cpu().numpy(), axis=0)
+    DistillationTrainData['r_len'] = np.append(DistillationTrainData['r_len'],data[1][1].cpu().numpy().reshape(data[1][1].shape[0], 1), axis=0)
+    DistillationTrainData['label'] = np.append(DistillationTrainData['label'], np.array(label.cpu()).reshape(label.shape[0], 1), axis=0)
+    DistillationTrainData['t_logits'] = np.append(DistillationTrainData['t_logits'], np.array(logits.cpu()), axis=0)
 
 if __name__ == "__main__":
     import argparse
@@ -193,8 +156,6 @@ if __name__ == "__main__":
     parser.add_argument('--checkpoint_file', type=str, default='',
                         help='checkpoint dir')
 
-    parser.add_argument('--part', type=int, default=10,
-                        help='eval part')
     parser.add_argument('--model_name', type=str, default='bert',
                         help='select a pre trained model')
     parser.add_argument("--bert_path", type=str, default="../data/pre_trained_ckpt/uncased_L-12_H-768_A-12",

@@ -59,6 +59,7 @@ def main(args):
                                      bert_path=args.bert_path)
     else:
         train_dataset = DistillationDataset(os.path.join(args.distill_dataset, 'distillation_dataset.pkl'))
+        train_dataset = DistillationDataset(os.path.join(args.distill_dataset, 'distillation_dataset.pkl'))
     eval_dataset = UbuntuCorpus(path=os.path.join(args.dataset_path, 'valid.csv'),
                                 type='valid',
                                 save_path=args.examples_path,
@@ -77,51 +78,27 @@ def main(args):
                            shuffle=False)
 
 
-    ## Build Bert model
-    if 'bert' == model_name:
-        bert_config = BertConfig.from_json_file(os.path.join(args.bert_path,
-                                                             'config.json'))
-        ModelClass = BertModel
-    elif 'distilbert' == model_name:
-        ModelClass = DistilBertModel
-        bert_config = DistilBertConfig.from_json_file(os.path.join(args.bert_path,
-                                                                   'config.json'))
-    if args.load_post_trained_bert:
-        pre_trianed_state  = torch.load(args.load_post_trained_bert, map_location='cpu')['model_state_dict']
-        bert_config.vocab_size += 2
-        print("loaded state dict from: {}".format(args.load_post_trained_bert))
-    else:
-        pre_trianed_state = torch.load(os.path.join(args.bert_path, 'pytorch_model.bin'),
-                                       map_location='cpu')
-    bert = ModelClass.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_trianed_state)
-    del pre_trianed_state
+
 
     # get embedding layer
-    if args.model == 'esim':
-        from gensim.models import Word2Vec
-        w2v_path = '/remote_workspace/fusion_esim/data/w2v/embeddings/ubuntu_corpus.model'
-        offset = 2
-        _word_embedding = Word2Vec.load(w2v_path)
-        _word_embedding = torch.FloatTensor(_word_embedding.wv.vectors)
-        n_token, d_emb = _word_embedding.shape
-        randn_embedding = torch.randn(n_token + offset, args.d_embed) # uniform distribution
-        randn_embedding[offset:n_token+offset, :] = _word_embedding
-        embeddings_layer = nn.Embedding.from_pretrained(randn_embedding, freeze=False)
-    else:
-        embeddings_layer = bert.embeddings.word_embeddings
+    from gensim.models import Word2Vec
+    w2v_path = '/remote_workspace/fusion_esim/data/w2v/embeddings/ubuntu_corpus.model'
+    offset = 2
+    _word_embedding = Word2Vec.load(w2v_path)
+    _word_embedding = torch.FloatTensor(_word_embedding.wv.vectors)
+    n_token, d_emb = _word_embedding.shape
+    randn_embedding = torch.randn(n_token + offset, args.d_embed) # uniform distribution
+    randn_embedding[offset:n_token+offset, :] = _word_embedding
+    embeddings_layer = nn.Embedding.from_pretrained(randn_embedding, freeze=False)
+
     ###############################################################################
     # Build the model
     ###############################################################################
 
-    if args.model == 'fusion_esim':
-        model = fusion_esim.FusionEsim(BERT=bert,
-                                       n_bert_token=train_dataset.Vocab.n_bert_token,
-                                       hidden_size=args.d_model,
-                                       dropout=args.dropout,)
-    elif args.model == 'esim':
-        model = fusion_esim.ESIM_like(hidden_size=args.d_model,
-                                      dropout=args.dropout,
-                                      bert_embeddings=embeddings_layer,)
+
+    model = fusion_esim.ESIM_like(hidden_size=args.d_model,
+                                  dropout=args.dropout,
+                                  bert_embeddings=embeddings_layer,)
 
     if args.optim.lower() == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.mom)

@@ -6,3 +6,4 @@ from .hook import *
 from .train import LSTMTrainer, FineTuningTrainer
 from .create_bert_post_training_data import *
 from .post_train_dataset import  *
+from .distillation_dataset import *
