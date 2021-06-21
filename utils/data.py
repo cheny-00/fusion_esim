@@ -97,7 +97,7 @@ class Vocab(object):
         #     offset += 1
         n_tokens = len(self.worddict)
         for i, word in enumerate(counts.most_common(num_words)):
-            if word[0] not in self.worddict and word[1] >= 5:
+            if word[0] not in self.worddict:
                 self.worddict[word[0]] = n_tokens
                 n_tokens += 1
 
@@ -145,7 +145,7 @@ class Vocab(object):
         for d in data[:2]:
             for x in d:
                 data_indices_str.append(list(map(str, x)))
-        w2v_model = Word2Vec(data_indices_str, size=300, window=5, min_count=5,
+        w2v_model = Word2Vec(data_indices_str, vector_size=300, window=5, min_count=5,
                              sg=1, workers=multiprocessing.cpu_count())
         return w2v_model
 
@@ -163,6 +163,8 @@ class Vocab(object):
                 except ValueError:
                     continue
             n_token = len(self.worddict)
+            # print(list(self.worddict.keys())[:100])
+            # print(list(self.worddict.values())[:100])
             embed_dim = len(list(embed_dict.values())[0])
             embed_matrix = np.zeros((n_token, embed_dim))
             for word, i in self.worddict.items():
@@ -256,17 +258,21 @@ class UbuntuCorpus(Dataset):
             self.data = w2v_data
             self.dump(self.data, s_path)
         if type == 'train':
-             # if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
-            emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.model'])
+            # if not self.Vocab.worddict: self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
+            emb_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.txt'])
+            emb_layer_path = reduce(os.path.join, [save_path, 'embeddings', 'ubuntu_corpus.npy'])
 
             if not self.Vocab.worddict and os.path.exists(wordict_path): self.Vocab.worddict = self.load(os.path.join(save_path, 'worddict'))
             elif not os.path.exists(wordict_path): self.Vocab.build_worddict(*self.data)
 
             if not os.path.exists(emb_path):
                 self.embeddings = self.Vocab.train_word2vec(self.data)
-                self.embeddings.save(emb_path)
+                self.embeddings.wv.save_word2vec_format(emb_path, binary=False)
+            if not os.path.exists(emb_layer_path):
+                self.embeddings = self.Vocab.build_embed_layer(emb_path)
+                np.save(emb_layer_path, self.embeddings)
             else:
-                self.embeddings = Word2Vec.load(emb_path) # offset = 2
+                self.embeddings = np.load(emb_layer_path)
 
 
 
@@ -346,12 +352,13 @@ def padding(seqs, seq_lens):
 
 
 if __name__ == '__main__':
+    hm = '/home/chy'
 
-    path = '/remote_workspace/dataset/default/valid.csv'
-    train_path = '/remote_workspace/dataset/default/train.csv'
-    save_path = '/remote_workspace/fusion_esim/data/w2v'
+    path = hm + '/remote_workspace/dataset/default/valid.csv'
+    train_path = hm + '/remote_workspace/dataset/default/train.csv'
+    save_path = hm + '/remote_workspace/fusion_esim/data/w2v'
     model_name = 'bert'
-    bert_path = '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8'
+    bert_path = hm + '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8'
     train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
     val_dataset = UbuntuCorpus(path=path, type='valid', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
     test_dataset = UbuntuCorpus(path=path, type='test', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
