@@ -4,7 +4,7 @@ if [ "$#" -gt 0 ]
 fi
 hm=""
 python3 ../esim_run.py \
-    --batch_size 32 \
+    --batch_size 64 \
     --proj_name train_esim  \
     --model esim \
     --embed_type 1  \

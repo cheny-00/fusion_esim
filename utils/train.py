@@ -155,10 +155,11 @@ class LSTMTrainer(Trainer):
 
     def get_loss(self, predicts, targets, label):
         alpha = 0.5
-        distill_loss = self.distill_loss_fn(predicts, targets)
+        # distill_loss = self.distill_loss_fn(predicts, targets)
         if len(label.size()) > 1: label = label.view(-1)
         loss = self.crit(predicts, label)
-        return (alpha * distill_loss) + ((1- alpha) * loss)
+        # return (alpha * distill_loss) + ((1- alpha) * loss)
+        return loss
 
     def train_process(self, data):
 
