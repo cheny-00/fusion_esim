@@ -221,9 +221,9 @@ class UbuntuCorpus(Dataset):
             features["seg_ids"].append(torch.tensor(seg, dtype=torch.long))
             features["attn_mask"].append(torch.tensor(attn, dtype=torch.long))
             neg_line.append((torch.tensor(anno[max_context_len:], dtype=torch.long), len(neg_seq)))
-        features["esim_data"] = ((torch.tensor(e_data['context'], dtype=torch.long), e_data['c_len']),
-                                 (torch.tensor(e_data['response'], dtype=torch.long),e_data['r_len']),
-                                 (torch.tensor(e_data['neg'], dtype=torch.long), e_data['neg_len']))
+        features["esim_data"] = ((torch.tensor(e_data['context'][idx], dtype=torch.long), e_data['c_len'][idx]),
+                                 (torch.tensor(e_data['response'][idx], dtype=torch.long),e_data['r_len'][idx]),
+                                 (torch.tensor(e_data['neg'][idx], dtype=torch.long), e_data['neg_len'][idx]))
         return features
     def __getitem__(self, idx):
         # input : context, response, label/ neg_samples

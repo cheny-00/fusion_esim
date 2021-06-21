@@ -4,7 +4,7 @@ if [ "$#" -gt 0 ]
 fi
 hm=""
 python3 ../esim_run.py \
-    --batch_size 64 \
+    --batch_size 32 \
     --proj_name train_esim  \
     --model esim \
     --embed_type 1  \
@@ -23,7 +23,7 @@ python3 ../esim_run.py \
     --model_name bert \
     --dataset_path $hm/remote_workspace/dataset/default \
     --examples_path $hm/remote_workspace/fusion_esim/data/bert_with_eot \
-    --distill_dataset /remote_workspace/fusion_esim/checkpoints/create_distillation_dataset/20210615-104832 \
+    --distill_dataset /remote_workspace/fusion_esim/checkpoints/create_distillation_dataset/20210619-211256 \
     --bert_path $hm/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-12_H-768_A-12 \
     --distill_step \
     --temperature 1 \
