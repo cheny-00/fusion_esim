@@ -154,7 +154,7 @@ class Trainer():
 class LSTMTrainer(Trainer):
 
     def get_loss(self, predicts, targets, label):
-        alpha = 1
+        alpha = 0.5
         distill_loss = self.distill_loss_fn(predicts, targets)
         if len(label.size()) > 1: label = label.view(-1)
         loss = self.crit(predicts, label)
@@ -180,7 +180,9 @@ class LSTMTrainer(Trainer):
         loss = self.crit(eva_lg, torch.tensor([1] * self.batch_size).to(self.device))
         prob = nn.functional.softmax(eva_lg, dim=1)[:, 1].unsqueeze(1)
         total_loss += loss.item()
-        for idx, b_sample in enumerate(b_neg):
+        neg_r, neg_l = b_neg[0].reshape(9, self.batch_size, 40), b_neg[1].reshape(9, self.batch_size, 1)
+        for  b_res, b_len in zip(neg_r, neg_l):
+            b_sample = (b_res, b_len)
             neg_data = (context, b_sample)
             eva_f_lg = self.model(neg_data)
             #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
