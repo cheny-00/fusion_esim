@@ -97,7 +97,7 @@ class Vocab(object):
         #     offset += 1
         n_tokens = len(self.worddict)
         for i, word in enumerate(counts.most_common(num_words)):
-            if word[0] not in self.worddict:
+            if word[0] not in self.worddict and word[1] >= 5:
                 self.worddict[word[0]] = n_tokens
                 n_tokens += 1
 
