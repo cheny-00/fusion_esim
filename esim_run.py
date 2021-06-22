@@ -82,14 +82,10 @@ def main(args):
 
     # get embedding layer
     from gensim.models import Word2Vec
-    w2v_path = '/remote_workspace/fusion_esim/data/w2v/embeddings/ubuntu_corpus.model'
-    offset = 2
-    _word_embedding = Word2Vec.load(w2v_path)
-    _word_embedding = torch.FloatTensor(_word_embedding.wv.vectors)
-    n_token, d_emb = _word_embedding.shape
-    randn_embedding = torch.randn(n_token + offset, args.d_embed) # uniform distribution
-    randn_embedding[offset:n_token+offset, :] = _word_embedding
-    embeddings_layer = nn.Embedding.from_pretrained(randn_embedding, freeze=False)
+    w2v_path = '/remote_workspace/fusion_esim/data/w2v/embeddings/ubuntu_corpus.npy'
+    _word_embedding = np.load(w2v_path)
+    _word_embedding = torch.FloatTensor(_word_embedding)
+    embeddings_layer = nn.Embedding.from_pretrained(_word_embedding, freeze=False)
 
     ###############################################################################
     # Build the model

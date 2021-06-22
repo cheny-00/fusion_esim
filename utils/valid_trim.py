@@ -29,7 +29,7 @@ def max_trim(text, max_len, rm_pos):
     while max_len < len(text):
         text.pop(rm_pos)
     return text
-with open(os.path.join(save_path, 'test'), 'rb') as f:
+with open(os.path.join(save_path, 'valid'), 'rb') as f:
     s_data =  dill.load(f)
 
 
@@ -78,6 +78,6 @@ e_data['r_len'] = np.array(r_len)
 e_data['neg'] = np.array(neg)
 e_data['neg_len'] = np.array(neg_len)
 
-save_file = os.path.join(save_path, 'esim_test_data.pkl')
+save_file = os.path.join(save_path, 'esim_valid_data.pkl')
 with open(save_file, 'wb') as f:
     pickle.dump(e_data, f)
