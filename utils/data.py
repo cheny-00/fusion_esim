@@ -158,7 +158,7 @@ class Vocab(object):
                 try:
                     float(line[1])
                     word = line[0]
-                    if word in self.worddict:
+                    if int(word) in self.worddict.values():
                         embed_dict[word] = line[1:]
                 except ValueError:
                     continue
@@ -356,7 +356,7 @@ if __name__ == '__main__':
 
     path = hm + '/remote_workspace/dataset/default/valid.csv'
     train_path = hm + '/remote_workspace/dataset/default/train.csv'
-    save_path = hm + '/remote_workspace/fusion_esim/data/w2v'
+    save_path = hm + '/remote_workspace/fusion_esim/data/w2v_bak_1'
     model_name = 'bert'
     bert_path = hm + '/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8'
     train_dataset = UbuntuCorpus(path=train_path, type='train', save_path=save_path, model_name=model_name, special=['__eou__', '__eot__'], bert_path=bert_path)
