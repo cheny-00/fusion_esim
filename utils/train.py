@@ -78,6 +78,12 @@ class Trainer():
                      epoch_num,
                      **kwargs):
         self.model.train()
+        for name, param in self.model.named_parameters():
+            param.requires_grad = False
+            if 'Bert' in name:
+                name = name.split(".")
+                if '_classifier' in name or 'pooler' in name or (len(name) > 5 and int(name[4]) > 7):
+                    param.requires_grad = True
         log_start_time = time.time()
         tqdm_train_iter = tqdm(self.train_iter)
         for batch, data in enumerate(tqdm_train_iter):
@@ -195,7 +201,7 @@ class LSTMTrainer(Trainer):
 class FineTuningTrainer(Trainer):
 
     def train_process(self, data):
-        label = data["label"].tolist()
+        label = data["label"]
         if len(label) != self.batch_size: return "continue"
         elif not set(label.tolist()) == set([0, 1]): return "continue"
         self.optimizer.zero_grad()
