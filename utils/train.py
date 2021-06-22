@@ -223,8 +223,11 @@ class FineTuningTrainer(Trainer):
         loss = self.crit(eva_lg_b, torch.tensor([1] * self.batch_size).to(self.device))
         prob = nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1)
         total_loss += loss.item()
-        for idx, b_sample in enumerate(b_neg):
+        neg_r, neg_l = b_neg[0].reshape(9, self.batch_size, 40), b_neg[1].reshape(9, self.batch_size, 1)
+        idx = 0
+        for  b_res, b_len in zip(neg_r, neg_l):
             batch = dict()
+            b_sample = (b_res, b_len)
             batch['esim_data'] = (data["esim_data"][0], b_sample)
             batch = self.batch_bert_data(batch, data, idx)
             x_1_eva_f_lg, x_2_eva_f_lg = self.model(batch, fine_tuning=True)
@@ -232,4 +235,5 @@ class FineTuningTrainer(Trainer):
             loss = self.crit(x_2_eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
             total_loss += loss.item()
             prob = torch.cat((prob, nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
+            idx += 1
         return prob, n_con, total_loss
