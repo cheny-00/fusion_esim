@@ -127,8 +127,6 @@ def eval_process(data,
                  device,
                  model):
     crit = nn.CrossEntropyLoss()
-    b_neg = data['esim_data'][2]
-    if len(data['esim_data'][0][0]) != batch_size: return "continue", n_con, total_loss
     n_con += 1
     eva_lg_b = model(data["anno_seq"][0].to(device),
                      data["attn_mask"][0].to(device),
@@ -137,7 +135,8 @@ def eval_process(data,
     loss = crit(eva_lg_b, torch.tensor([1] * batch_size).to(device))
     prob = nn.functional.softmax(eva_lg_b, dim=1)[:, 1].unsqueeze(1)
     total_loss += loss.item()
-    for idx, b_sample in enumerate(b_neg):
+
+    for idx in range(9):
         x_2_eva_f_lg = model(data["anno_seq"][idx + 1].to(device),
                              data["attn_mask"][idx + 1].to(device),
                              data["seg_ids"][idx + 1].to(device),
@@ -146,6 +145,7 @@ def eval_process(data,
         loss = crit(x_2_eva_f_lg, torch.tensor([0] * batch_size).to(device))
         total_loss += loss.item()
         prob = torch.cat((prob, nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
+        idx += 1
     return prob, n_con, total_loss
 
 def get_score(n_eval,
