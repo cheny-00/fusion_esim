@@ -19,7 +19,7 @@ class ESIM_like(nn.Module):
                  ismasked=True):
         super(ESIM_like, self).__init__()
         # hyper parameters
-        self.input_size = 512
+        self.input_size = 300
         self.hidden_size = hidden_size
         self.n_layer = n_layer
         self.dropout = dropout
@@ -30,12 +30,12 @@ class ESIM_like(nn.Module):
 
         self.rnn_drop = RNNDropout(p=self.dropout)
         # word emb
-        self.bert_embeddings = bert_embeddings
-        self.embedding = embedding_layer
+        # self.bert_embeddings = bert_embeddings
+        self.embeddings = embedding_layer
 
         # combine embeddings
-        self.combine_inp = nn.Sequential(nn.Linear(self.bert_embeddings.embedding_dim + self.embedding.embedding_dim,
-                                                   self.input_size),)
+        # self.combine_inp = nn.Sequential(nn.Linear(self.bert_embeddings.embedding_dim + self.embedding.embedding_dim,
+        #                                            self.input_size),)
         # word level
         self.token_enc = RNN_encoder(nn.LSTM,
                                      input_size=self.input_size,
@@ -81,7 +81,7 @@ class ESIM_like(nn.Module):
         # inp = tuple(zip(*(w2v_data, b_data))) # c, c_l, r, r_l
         context_len, response_len = None, None
         # w2v_c, w2v_r = tuple(map(lambda x:self.embedding(x[0].clone().detach().cuda()), w2v_data[:2]))
-        bert_c, bert_r = tuple(map(lambda x:self.bert_embeddings(x[0].clone().detach().cuda()), b_data[:2]))
+        bert_c, bert_r = tuple(map(lambda x:self.embeddings(x[0].clone().detach().cuda()), w2v_data[:2]))
         # w2v_c, bert_c = self.__padding(w2v_c, bert_c)
         # w2v_r, bert_r = self.__padding(w2v_r, bert_r)
 

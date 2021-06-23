@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from eval.evaluation import eval_samples
 from utils import get_mask_from_seq_lens
+from tqdm import tqdm
 class Trainer:
 
     def __init__(self,
@@ -167,8 +168,9 @@ class Trainer:
         self.model.train()
         device = self.device
         log_start_time = 0
-        for batch, data in enumerate(self.train_iter):
-            w2v_data, b_data, label = data[0], data[1], data[0][2]
+        tqdm_train_iter = tqdm(self.train_iter)
+        for batch, data in enumerate(tqdm_train_iter):
+            w2v_data, b_data, label = data, None, data[2]
             if len(label) != self.batch_size: continue
             elif not set(list(label)) == set([0, 1]): continue
             self.optimizer.zero_grad()
@@ -201,7 +203,8 @@ class Trainer:
                 log_str = '| epoch {:3d} step {:>8d} | {:>6d} batches | lr {:.3g} ' \
                           '| ms/batch {:5.2f} | loss {}'.format(epoch_num, self.train_step, batch+1, self.optimizer.param_groups[0]['lr'],
                                                                 elapsed * 1000 / self.log_interval, cur_loss)
-                self.logging(log_str)
+                self.logging(log_str, print_=False)
+                tqdm_train_iter.set_description(log_str, refresh=False)
                 self.plotter.plot('train_loss', 'train', 'loss curve', self.train_step, cur_loss)
                 self.train_loss = 0
                 log_start_time = time.time()
@@ -212,10 +215,10 @@ class Trainer:
 
         total_loss, n_con, eval_start_time = 0, 0, 0
         prob_set = []
-
+        tqdm_eval_iter = tqdm(self.eval_iter)
         with torch.no_grad():
 
-            for i, data in enumerate(self.eval_iter):
+            for i, data in enumerate(tqdm_eval_iter):
                 w2v_data, b_data = data[0], data[1]
                 w_neg, b_neg = w2v_data[2], b_data[2]
                 if len(w2v_data[0][0]) != self.batch_size: continue
@@ -234,15 +237,16 @@ class Trainer:
                     prob = torch.cat((prob, nn.functional.softmax(x_1_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
                 prob_set.append(prob.tolist())
             eva = eval_samples(prob_set)
-        self.logging('-' * 100)
+        # self.logging('-' * 100)
         log_str = '| Eval at step {:>8d} | time: {:5.2f}s ' \
                   '| valid loss {:5.4f} | R_1@2 {:5.4f} | R_1@10 {:5.4f} | R_2@10 {:5.4f} |'\
                   ' R_5@10 {:5.4f} | MAP {:5.4f} | MRR {:5.4f}  '.format(self.train_step,
                                                                          (time.time() - eval_start_time),
                                                                          total_loss / (n_con * 10),
                                                                          eva[0], eva[1], eva[2], eva[3], eva[4], eva[5])
-        self.logging(log_str)
-        self.logging('-' * 100)
+        self.logging(log_str, print_=False)
+        tqdm_eval_iter.set_description(log_str)
+        # self.logging('-' * 100)
         self.model.train()
         return eva, (total_loss / (n_con * 10))
     def get_train_loss(self):

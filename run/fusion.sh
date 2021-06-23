@@ -16,5 +16,6 @@ python3 ../fusion_run.py \
     --cuda              \
     --model_name bert \
     --dataset_path /remote_workspace/dataset/default \
-    --examples_path /remote_workspace/fusion_esim/data/examples \
-    --bert_path /remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-8_H-512_A-8 
+    --examples_path /remote_workspace/fusion_esim/data/w2v_bak_1 \
+    --bert_path /remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-12_H-768_A-12  \
+    --debug
