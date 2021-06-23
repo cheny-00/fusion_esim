@@ -99,17 +99,25 @@ def main(args):
         if not args.fp16:
             model = model.float()
     else:
-        if args.model == 'fusion_esim':
-            model = fusion_esim.FusionEsim(BERT=bert,
-                                           bert_dim=512,
-                                           n_bert_token=-1,
-                                           n_token=-1,
-                                           input_size=args.d_embed,
-                                           hidden_size=args.d_model,
-                                           dropout=args.dropout,
-                                           dropatt=args.dropatt,
-                                           embedding_layer=embedding_layer,
-                                           n_layer=args.n_layer)
+        # if args.model == 'fusion_esim':
+        #     model = fusion_esim.FusionEsim(BERT=bert,
+        #                                    bert_dim=512,
+        #                                    n_bert_token=-1,
+        #                                    n_token=-1,
+        #                                    input_size=args.d_embed,
+        #                                    hidden_size=args.d_model,
+        #                                    dropout=args.dropout,
+        #                                    dropatt=args.dropatt,
+        #                                    embedding_layer=embedding_layer,
+        #                                    n_layer=args.n_layer)
+        model = ESIM_like(n_token=-1,
+                          input_size=args.d_embed,
+                          hidden_size=args.d_model,
+                          dropout=args.dropout,
+                          dropatt=args.dropatt,
+                          n_layer=args.n_layer,
+                          embedding_layer=embedding_layer,
+                          bert_embeddings=None)
 
     if args.optim.lower() == 'sgd':
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.mom)

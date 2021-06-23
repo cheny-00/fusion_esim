@@ -177,7 +177,7 @@ class Trainer:
             self.train_step += 1
             label = torch.tensor(label, dtype=torch.long)
 
-            x_1_logit, x_2_logit = self.model(w2v_data,
+            x_1_logit = self.model(w2v_data,
                                               b_data)
             loss = self.crit(x_1_logit, label.to(device))  #+ \
                 #    self.crit(x_2_logit, label.to(device))
