@@ -23,7 +23,7 @@ python3 ../esim_run.py \
     --model_name bert \
     --dataset_path $hm/remote_workspace/dataset/default \
     --examples_path $hm/remote_workspace/fusion_esim/data/bert_with_eot \
-    --distill_dataset /remote_workspace/fusion_esim/checkpoints/create_distillation_dataset/20210619-211256 \
+    --distill_dataset /remote_workspace/fusion_esim/checkpoints/create_distillation_dataset/20210621-150306 \
     --bert_path $hm/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-12_H-768_A-12 \
     --distill_step \
     --temperature 1 \
