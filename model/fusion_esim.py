@@ -79,7 +79,7 @@ class ESIM_like(nn.Module):
 
     def forward(self, w2v_data, b_data):
         # inp = tuple(zip(*(w2v_data, b_data))) # c, c_l, r, r_l
-        context_len, response_len = None, None
+        context_len, response_len = w2v_data[0][1], w2v_data[1][1]
         # w2v_c, w2v_r = tuple(map(lambda x:self.embedding(x[0].clone().detach().cuda()), w2v_data[:2]))
         bert_c, bert_r = tuple(map(lambda x:self.embeddings(x[0].clone().detach().cuda()), w2v_data[:2]))
         # w2v_c, bert_c = self.__padding(w2v_c, bert_c)
@@ -91,7 +91,7 @@ class ESIM_like(nn.Module):
         context_embed, response_embed = bert_c, bert_r
 
         # word embed
-        if not self.ismasked:
+        if self.ismasked:
             c_mask = get_mask_from_seq_lens(context_len).cuda()
             r_mask = get_mask_from_seq_lens(response_len).cuda()
         else:
