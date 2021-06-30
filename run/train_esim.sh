@@ -5,7 +5,7 @@ fi
 hm=""
 python3 ../esim_run.py \
     --batch_size 64 \
-    --proj_name train_esim  \
+    --proj_name bert_emb_soft_kl_d_train_esim  \
     --model esim \
     --embed_type 1  \
     --n_layer 6     \
@@ -23,10 +23,12 @@ python3 ../esim_run.py \
     --model_name bert \
     --dataset_path $hm/remote_workspace/dataset/default \
     --examples_path $hm/remote_workspace/fusion_esim/data/bert_with_eot \
-    --distill_dataset /remote_workspace/fusion_esim/checkpoints/create_distillation_dataset/20210621-150306 \
+    --distill_dataset /remote_workspace/fusion_esim/checkpoints/create_distillation_dataset/bert_with_eot_data \
     --bert_path $hm/remote_workspace/fusion_esim/data/pre_trained_ckpt/uncased_L-12_H-768_A-12 \
     --distill_step \
     --temperature 1 \
     --eval_interval 3 \
+    --distill_loss_fn soft_kl_d \
+   --load_post_trained_bert $hm/remote_workspace/fusion_esim/checkpoints/bert_post_train/20210608-221516/bert_2.pth.tar \
     $args
-   #--load_post_trained_bert $hm/remote_workspace/fusion_esim/checkpoints/bert_post_train/20210608-221516/bert_2.pth.tar \
+#    --distill_dataset /remote_workspace/fusion_esim/checkpoints/create_distillation_dataset/20210621-150306 \

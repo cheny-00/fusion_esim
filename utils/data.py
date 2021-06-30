@@ -225,10 +225,46 @@ class UbuntuCorpus(Dataset):
                                  (torch.tensor(e_data['response'][idx], dtype=torch.long),e_data['r_len'][idx]),
                                  (torch.tensor(e_data['neg'][idx], dtype=torch.long), e_data['neg_len'][idx]))
         return features
+
+    @staticmethod
+    def get_bert_item(idx, data, train, max_context_len, max_response_len):
+        context, response = data[0][idx], data[1][idx]
+        anno_seq, seg_ids, attn_mask = bert_input_data(context, response, max_context_len, max_response_len)
+        if train:
+            label = data[2][idx]
+            features = dict()
+            features["esim_data"] = ((torch.tensor(anno_seq[:max_context_len], dtype=torch.long), len(context)),
+                                     (torch.tensor(anno_seq[max_context_len:], dtype=torch.long), len(response)),
+                                     label)
+            features["anno_seq"] = torch.tensor(anno_seq, dtype=torch.long)
+            features["seg_ids"] = torch.tensor(seg_ids, dtype=torch.long)
+            features["attn_mask"] = torch.tensor(attn_mask, dtype=torch.long)
+            features["label"] = label
+            return features
+
+        n_sample = len(data[2])
+        neg_line = list()
+        features = dict()
+        features["anno_seq"] = [torch.tensor(anno_seq, dtype=torch.long)]
+        features["seg_ids"] = [torch.tensor(seg_ids, dtype=torch.long)]
+        features["attn_mask"] = [torch.tensor(attn_mask, dtype=torch.long)]
+
+        for neg in range(n_sample):
+            neg_seq = data[2][neg][idx]
+            anno, seg, attn = bert_input_data(context, neg_seq, max_context_len, max_response_len)
+            features["anno_seq"].append(torch.tensor(anno, dtype=torch.long))
+            features["seg_ids"].append(torch.tensor(seg, dtype=torch.long))
+            features["attn_mask"].append(torch.tensor(attn, dtype=torch.long))
+            neg_line.append((torch.tensor(anno[max_context_len:], dtype=torch.long), len(neg_seq)))
+        features["esim_data"] = ((torch.tensor(anno_seq[:max_context_len], dtype=torch.long), len(context)),
+                                 (torch.tensor(anno_seq[max_context_len:], dtype=torch.long), len(response)),
+                                 neg_line)
+        return features
     def __getitem__(self, idx):
         # input : context, response, label/ neg_samples
         # output: (context, context_len), (response, response_len), ...
-        return self.get_item(idx, self.data, self.e_data, self.type=='train', self.max_context_len, self.max_response_len)
+        return self.get_bert_item(idx, self.data, self.type=='train', self.max_context_len, self.max_response_len)
+        # else: return self.get_item(idx, self.data, self.e_data, self.type=='train', self.max_context_len, self.max_response_len)
 
     def dump(self, data, path):
         with open(path, 'wb') as f:

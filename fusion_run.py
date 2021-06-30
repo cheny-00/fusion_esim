@@ -97,7 +97,7 @@ def main(args):
     del pre_trianed_state
 
     # get embedding layer
-    if args.model == 'esim':
+    if not args.model == 'esim':
         from gensim.models import Word2Vec
         w2v_path = '/remote_workspace/fusion_esim/data/w2v/embeddings/ubuntu_corpus.model'
         offset = 2

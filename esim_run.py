@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import pickle
 
-from utils.train import LSTMTrainer, FineTuningTrainer
+from utils.train import LSTMTrainer, FineTuningTrainer, LSTMTrainerWithBertInput
 from model import *
 from utils.exp_utils import create_exp_dir, save_checkpoint
 from utils.visdom_plot import VisdomLinePlotter
@@ -43,6 +43,7 @@ def main(args):
 
     plotter = VisdomLinePlotter(env_name="{}".format(args.proj_name))
     device = torch.device('cuda' if args.cuda else 'cpu')
+    # device = torch.device('cpu')
     torch.cuda.set_device(0)
 
     ###############################################################################
@@ -58,7 +59,6 @@ def main(args):
                                      special=['__eou__', '__eot__'],
                                      bert_path=args.bert_path)
     else:
-        train_dataset = DistillationDataset(os.path.join(args.distill_dataset, 'distillation_dataset.pkl'))
         train_dataset = DistillationDataset(os.path.join(args.distill_dataset, 'distillation_dataset.pkl'))
     eval_dataset = UbuntuCorpus(path=os.path.join(args.dataset_path, 'valid.csv'),
                                 type='valid',
@@ -81,12 +81,19 @@ def main(args):
 
 
     # get embedding layer
-    from gensim.models import Word2Vec
-    w2v_path = '/remote_workspace/fusion_esim/data/w2v_bak_1/embeddings/ubuntu_corpus.npy'
-    _word_embedding = np.load(w2v_path)
-    _word_embedding = torch.FloatTensor(_word_embedding)
-    embeddings_layer = nn.Embedding.from_pretrained(_word_embedding, freeze=False)
+    # w2v_path = '/remote_workspace/fusion_esim/data/w2v_bak_1/embeddings/ubuntu_corpus.npy'
+    # _word_embedding = np.load(w2v_path)
+    # _word_embedding = torch.FloatTensor(_word_embedding)
+    # embeddings_layer = nn.Embedding.from_pretrained(_word_embedding, freeze=False)
 
+    bert_config = BertConfig.from_json_file(os.path.join(args.bert_path,
+                                                         'config.json'))
+    ModelClass = BertModel
+    pre_trianed_state  = torch.load(args.load_post_trained_bert, map_location='cpu')['model_state_dict']
+    bert_config.vocab_size += 2
+    bert = ModelClass.from_pretrained(args.bert_path, config=bert_config, state_dict=pre_trianed_state)
+    embeddings_layer = bert.embeddings.word_embeddings
+    del pre_trianed_state
     ###############################################################################
     # Build the model
     ###############################################################################
@@ -155,8 +162,9 @@ def main(args):
         if not args.fp16:
             model = model.float()
     crit = args.crit
-    if args.fine_tuning: TrainerClass = FineTuningTrainer
-    else: TrainerClass = LSTMTrainer
+    # if args.fine_tuning: TrainerClass = FineTuningTrainer
+    # else: TrainerClass = LSTMTrainer
+    TrainerClass = LSTMTrainerWithBertInput
     train_model = TrainerClass(model=model,
                                train_iter=train_iter,
                                eval_iter=eval_iter,

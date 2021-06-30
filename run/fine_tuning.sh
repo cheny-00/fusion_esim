@@ -19,7 +19,6 @@ python3 ../fusion_run.py \
     --scheduler inv_sqrt \
     --warmup_step 8100 \
     --epochs 5 \
-    --cuda              \
     --model_name bert \
     --dataset_path $hm/remote_workspace/dataset/default \
     --examples_path $hm/remote_workspace/fusion_esim/data/bert_with_eot \

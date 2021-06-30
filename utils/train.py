@@ -8,9 +8,18 @@ from functools import partial
 from utils import get_mask_from_seq_lens
 
 def soft_cross_entropy(predicts, targets, temp):
+    temp = torch.tensor(int(temp))
     student_likelihood = torch.nn.functional.log_softmax(predicts / temp, dim=-1)
     targets_prob = torch.nn.functional.softmax(targets / temp, dim=-1)
-    return (- targets_prob * student_likelihood).mean()
+    return (- targets_prob * student_likelihood).mean() * temp * temp
+
+def soft_kl_div_loss(predicts, targets, temp):
+    temp = torch.tensor((int(temp)))
+    student_likilihood = nn.functional.log_softmax(predicts / temp, dim=-1)
+    targets_prob = nn.functional.softmax(targets / temp, dim=-1)
+    kl_loss = nn.KLDivLoss(reduction='batchmean')(student_likilihood, targets_prob)
+    return kl_loss * temp * temp
+
 
 class Trainer():
 
@@ -45,6 +54,7 @@ class Trainer():
         self.train_step = 0
         self.train_loss = train_loss
         self.model_name = model_name
+        self.temperature = temperature
         self.distill_loss_fn = self.select_loss_fn(distill_loss_fn, temperature)
         self.crit = self.select_loss_fn(crit)
 
@@ -64,8 +74,8 @@ class Trainer():
             loss_fn = nn.CrossEntropyLoss()
         elif loss_fn_name == "mse":
             loss_fn = nn.MSELoss()
-        elif loss_fn_name == "kl_d":
-            loss_fn = nn.KLDivLoss
+        elif loss_fn_name == "soft_kl_d":
+            loss_fn = partial(soft_kl_div_loss, temp=temp)
         elif loss_fn_name == "soft_cross_entropy":
             loss_fn = partial(soft_cross_entropy, temp=temp)
         return loss_fn
@@ -161,12 +171,12 @@ class Trainer():
 class LSTMTrainer(Trainer):
 
     def get_loss(self, predicts, targets, label):
-        alpha = 0.5
-        # distill_loss = self.distill_loss_fn(predicts, targets)
+        alpha = 1
+        distill_loss = self.distill_loss_fn(predicts, targets)
         if len(label.size()) > 1: label = label.view(-1)
         loss = self.crit(predicts, label)
-        # return (alpha * distill_loss) + ((1- alpha) * loss)
-        return loss
+        return (alpha * distill_loss) + ((1- alpha) * loss)
+        # return loss
 
     def train_process(self, data):
 
@@ -236,4 +246,43 @@ class FineTuningTrainer(Trainer):
             total_loss += loss.item()
             prob = torch.cat((prob, nn.functional.softmax(x_2_eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
             idx += 1
+        return prob, n_con, total_loss
+class LSTMTrainerWithBertInput(Trainer):
+
+    def get_loss(self, predicts, targets, label):
+        alpha = 1
+        distill_loss = self.distill_loss_fn(predicts, targets)
+        if len(label.size()) > 1: label = label.view(-1)
+        loss = self.crit(predicts, label)
+        return (alpha * distill_loss) + ((1- alpha) * loss)
+        # return loss
+
+    def train_process(self, data):
+
+        label = data["label"]
+        if len(label) != self.batch_size: return "continue"
+        # elif not set(label.tolist()) == set([0, 1]): return "continue"
+        self.optimizer.zero_grad()
+        self.train_step += 1
+        x_logits = self.model(data['esim_data'])
+        y_logits = data['t_logits'].cuda()
+        loss = self.get_loss(x_logits, y_logits, label.cuda())
+        return loss
+
+    def eval_process(self, data, n_con, total_loss):
+        b_neg = data["esim_data"][2]
+        if len(data["esim_data"][0][0]) != self.batch_size: return "continue"
+        n_con += 1
+        eva_lg= self.model(data['esim_data'])
+        loss = self.crit(eva_lg, torch.tensor([1] * self.batch_size).to(self.device))
+        prob = nn.functional.softmax(eva_lg, dim=1)[:, 1].unsqueeze(1)
+        total_loss += loss.item()
+        for idx, b_sample in enumerate(b_neg):
+
+            neg_data = (data["esim_data"][0], b_sample)
+            eva_f_lg = self.model(neg_data)
+            #  TODO 驗證方法 R10@1 R10@5 R2@1 MAP MMR | R@n => 是否在前n位
+            loss = self.crit(eva_f_lg, torch.tensor([0] * self.batch_size).to(self.device))
+            total_loss += loss.item()
+            prob = torch.cat((prob, nn.functional.softmax(eva_f_lg, dim=1)[:, 1].unsqueeze(1)), dim=1)
         return prob, n_con, total_loss
